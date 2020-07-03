@@ -1,16 +1,21 @@
+from abc import ABC, abstractmethod
+
 from action_selectors import BaseActionSelector
-from agents.agent_training import AgentTraining
 
 
-class REINFORCE(AgentTraining):
+class AgentTraining(ABC):
+    @abstractmethod
     def __init__(self):
-        super().__init__()
+        pass
 
+    @abstractmethod
     def train(self, save_path):
         pass
 
+    @abstractmethod
     def load_selector(self, load_path) -> BaseActionSelector:
         pass
 
+    @abstractmethod
     def get_environment(self):
         pass

@@ -1,0 +1,4 @@
+TODO:
+> Make training restartable
+> Parametrize the training with the environment and the model
+> make .train return a selector

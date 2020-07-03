@@ -9,7 +9,8 @@ CompleteTransition = namedtuple("CompleteTransition", ["previous_state", "next_s
 class BaseStepsGenerator(ABC):
     @abstractmethod
     def __init__(self, env, action_selector: BaseActionSelector):
-        pass
+        self.action_selector = action_selector
+        self.env = env
 
     @abstractmethod
     def __iter__(self):
