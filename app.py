@@ -1,24 +1,34 @@
 import gym
+
+from action_selectors import RandomDiscreteSelector
 from agents.REINFORCE import REINFORCE
 
 
-N_EPISODES = 5
+N_EPISODES = 100
 MAX_EPISODE_LENGTH = 500
-training = REINFORCE()
-env = training.get_environment()
+# training = REINFORCE()
+# env = training.get_environment()
+#
+# training.train("checkpoint.h5")
+# selector = training.load_selector("checkpoint.h5")
 
-training.train("checkpoint.h5")
-selector = training.load_selector("checkpoint.h5")
+# Uncomment for a random baseline
+env=gym.make("CartPole-v1")
+selector = RandomDiscreteSelector(env.action_space.n)
 
-### The game loop ###
-current_state = env.reset()
+# The game loop
+for episode_idx in range(N_EPISODES):
+    current_state = env.reset()
+    sum = 0
 
-for _ in range(N_EPISODES):
     for step_idx in range(MAX_EPISODE_LENGTH):
         env.render()
-        next_state, reward, done, _ = env.step(selector.pick(current_state))
-        print(f"At step {step_idx}, the reward is {reward}")
+        action = selector.pick(current_state)
+        current_state, reward, done, _ = env.step(action)
+        sum += reward
 
         if done or step_idx == MAX_EPISODE_LENGTH-1:
             env.render()
             break
+
+    print(f"At episode {episode_idx}, \t the reward is {sum}")
