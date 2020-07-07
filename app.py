@@ -6,15 +6,17 @@ from agents.REINFORCE import REINFORCE
 
 N_EPISODES = 100
 MAX_EPISODE_LENGTH = 500
-# training = REINFORCE()
-# env = training.get_environment()
-#
-# training.train("checkpoint.h5")
-# selector = training.load_selector("checkpoint.h5")
+# Uncomment for a proper agent
+training_class = REINFORCE
+training_instance = training_class()
+env = training_class.get_environment()
+
+training_instance.train("checkpoint.h5")
+selector = training_class.load_selector("checkpoint.h5")
 
 # Uncomment for a random baseline
-env=gym.make("CartPole-v1")
-selector = RandomDiscreteSelector(env.action_space.n)
+# env = gym.make("CartPole-v1")
+# selector = RandomDiscreteSelector(env.action_space.n)
 
 # The game loop
 for episode_idx in range(N_EPISODES):

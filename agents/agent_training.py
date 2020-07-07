@@ -1,21 +1,24 @@
 from abc import ABC, abstractmethod
 
+import gym
+from torch import load
+
 from action_selectors import BaseActionSelector
 
 
 class AgentTraining(ABC):
     @abstractmethod
     def __init__(self):
-        pass
+        self._env = self.get_environment()
 
     @abstractmethod
     def train(self, save_path):
         pass
 
-    @abstractmethod
+    @classmethod
     def load_selector(self, load_path) -> BaseActionSelector:
-        pass
+        return load(load_path)
 
-    @abstractmethod
+    @classmethod
     def get_environment(self):
-        pass
+        return gym.make("CartPole-v1")
