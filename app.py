@@ -19,7 +19,7 @@ torch.manual_seed(0)
 
 # Uncomment for a proper agent
 training_class = REINFORCE
-training_instance = training_class(max_training_steps=1500000)
+training_instance = training_class(max_training_steps=2000000)
 env = training_class.get_environment()
 
 training_instance.train("checkpoint.h5")
