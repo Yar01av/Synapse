@@ -18,7 +18,7 @@ class CompositeMemory:
 
         self.rewards.clear()
 
-        return list(reversed(qs))
+        self.q_vals.extend(list(reversed(qs)))
 
     def reset(self):
         self.actions.clear()

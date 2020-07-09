@@ -30,7 +30,7 @@ class SimplePolicySelector(BaseActionSelector):
 
     @no_grad()
     def pick(self, state):
-        probs = self._model(FloatTensor(state).cuda()).softmax(dim=1)
+        probs = self._model(FloatTensor(state).cuda()).softmax(dim=0)
 
         return np.random.choice(range(self._action_space_size), p=np.squeeze(probs.cpu().detach().numpy()))
 

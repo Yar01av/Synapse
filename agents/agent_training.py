@@ -16,9 +16,10 @@ class AgentTraining(ABC):
         pass
 
     @classmethod
-    def load_selector(self, load_path) -> BaseActionSelector:
-        return load(load_path)
+    @abstractmethod
+    def load_selector(cls, load_path) -> BaseActionSelector:
+        pass
 
     @classmethod
-    def get_environment(self):
+    def get_environment(cls):
         return gym.make("CartPole-v1")

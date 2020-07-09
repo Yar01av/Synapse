@@ -24,6 +24,9 @@ class SimpleStepsGenerator(BaseStepsGenerator):
     def __iter__(self):
         step_idx = 0
         former_state = self._env.reset()
+        reward_sum = 0
+        inter_episode_reward_sum = 0
+        e = 0
 
         while True:
             action = self._action_selector.pick(former_state)
@@ -32,10 +35,14 @@ class SimpleStepsGenerator(BaseStepsGenerator):
                                      done=done)
 
             former_state = next_state
+            reward_sum += reward
 
             if done:
+                e += 1
+                inter_episode_reward_sum += reward_sum
                 print("The episode is finished!")
+                print(f"At episode {e}, \t the reward is {reward_sum}")
+                reward_sum = 0
                 former_state = self._env.reset()
 
-            step_idx = step_idx+1
-            print(f"At step {step_idx}, the reward is {reward}")
+            step_idx += 1
