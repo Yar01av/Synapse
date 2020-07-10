@@ -1,11 +1,9 @@
 from random import seed
 
-import gym
 import torch
 from tensorflow import set_random_seed
 
-from action_selectors import RandomDiscreteSelector
-from agents.REINFORCE import REINFORCE
+from agents.reinforce import REINFORCE
 
 
 N_EPISODES = 10

@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 
 import gym
-from torch import load
 
-from action_selectors import BaseActionSelector
+from selectors.action_selectors import BaseActionSelector
 
 
 class AgentTraining(ABC):

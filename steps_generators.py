@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from action_selectors import BaseActionSelector
+from selectors.action_selectors import BaseActionSelector
 
 Transition = namedtuple("Transition", ["state", "action", "reward", "done"])
 CompleteTransition = namedtuple("CompleteTransition", ["previous_state", "next_state", "action", "reward", "done"])

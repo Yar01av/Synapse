@@ -42,3 +42,16 @@ class RandomDiscreteSelector(BaseActionSelector):
 
     def pick(self, state):
         return random.choice(range(self._n_actions))
+
+
+class ProbValuePolicySelector(BaseActionSelector):
+    def __init__(self, action_space_size, model):
+        super().__init__()
+        self._model = model
+        self._action_space_size = action_space_size
+
+    @no_grad()
+    def pick(self, state):
+        probs = self._model(FloatTensor(state).cuda())[0].softmax(dim=0)
+
+        return np.random.choice(range(self._action_space_size), p=np.squeeze(probs.cpu().detach().numpy()))
