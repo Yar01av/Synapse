@@ -72,18 +72,23 @@ class REINFORCE(AgentTraining):
 
                 # Compute the policy loss
                 policy_loss = -(t_qval*t_logits.log_softmax(dim=1)[range(len(t_state)), t_act]).mean()
-                # Compute the entropy
+                # Compute the entropy and record the original probabilities for later
                 entropy = -(t_logits.softmax(dim=1)*t_logits.log_softmax(dim=1)).sum(dim=1).mean()
-                # Compute KL divergence
+                old_probs = t_logits.softmax(dim=1)
 
                 (policy_loss-self._beta*entropy).backward()
                 self._optimizer.step()
+
+                # Compute KL divergence
+                new_probs = self._model(t_state).softmax(dim=1)
+                kl_divergence = -((new_probs/old_probs).log()*old_probs).sum(dim=1).mean()
 
                 batch_count = 0
                 self._memory.reset()
 
                 # Plot
-                self._plotter.add_scalar("Entropy", float(entropy), episode_idx)
+                self._plotter.add_scalar("Entropy", entropy.item(), episode_idx)
+                self._plotter.add_scalar("KL Divergence", kl_divergence.item(), episode_idx)
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
