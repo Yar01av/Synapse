@@ -3,11 +3,11 @@ from collections import deque
 from torch.optim import Adam
 from tensorboardX import SummaryWriter
 
-from selectors.action_selectors import BaseActionSelector, SimplePolicySelector
+from action_selectors import BaseActionSelector, SimplePolicySelector
 from agents.agent_training import AgentTraining
 from torch import load, nn, cuda, save, LongTensor, FloatTensor
 from memory import CompositeMemory
-from steps_generators import SimpleStepsGenerator
+from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator
 
 
 class REINFORCE(AgentTraining):
@@ -31,8 +31,9 @@ class REINFORCE(AgentTraining):
         self._plotter = SummaryWriter(comment="xREINFORCE")
 
     def train(self, save_path):
-        steps_generator = SimpleStepsGenerator(self._env,
-                                               SimplePolicySelector(self._env.action_space.n, model=self._model))
+        steps_generator = CompressedStepsGenerator(self._env,
+                                                   SimplePolicySelector(self._env.action_space.n, model=self._model))
+
         batch_count = 0
         last_episodes_rewards = deque(maxlen=100)
         reward_sum = 0
@@ -57,6 +58,7 @@ class REINFORCE(AgentTraining):
 
                 self._plotter.add_scalar("Total reward per episode", reward_sum, episode_idx)
                 print(f"At step {idx}, \t the average over the last 100 games is {sum(last_episodes_rewards)/100}")
+                x = sum(last_episodes_rewards)/100
 
                 reward_sum = 0
 

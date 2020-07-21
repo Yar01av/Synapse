@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 
 import gym
-
-from selectors.action_selectors import BaseActionSelector
+from action_selectors import BaseActionSelector
 
 
 class AgentTraining(ABC):

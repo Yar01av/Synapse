@@ -1,8 +1,12 @@
 from random import seed
 
+# import os
+# os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+
 import torch
 from tensorflow import set_random_seed
 
+from agents.a2c import A2C
 from agents.reinforce import REINFORCE
 
 
@@ -16,7 +20,7 @@ set_random_seed(123)
 torch.manual_seed(0)
 
 # Uncomment for a proper agent
-training_class = REINFORCE
+training_class = A2C
 training_instance = training_class(max_training_steps=2000000)
 env = training_class.get_environment()
 
