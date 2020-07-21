@@ -1,4 +1,8 @@
 class CompositeMemory:
+    """
+    A memory that can easily compute the actual Q-values for the experiences stored there.
+    """
+
     def __init__(self):
         self.actions = []
         self.states = []
@@ -6,7 +10,7 @@ class CompositeMemory:
         self.q_vals = []
         self.rewards = []
 
-    # Compute Q-values for the episode
+    # Compute Q-values for the episode. Make sure to call the method every time a final state is reached.
     def compute_qvals(self, gamma):
         qs = []
 

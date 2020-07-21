@@ -9,6 +9,10 @@ CompressedTransition = namedtuple("CompressedTransition", ["previous_state", "ne
 
 
 class BaseStepsGenerator(ABC):
+    """
+    Base class for generators returning experiences of playing with the environment according to the semantics of MDP.
+    """
+
     @abstractmethod
     def __init__(self, env, action_selector: BaseActionSelector):
         self._action_selector = action_selector
@@ -20,6 +24,10 @@ class BaseStepsGenerator(ABC):
 
 
 class SimpleStepsGenerator(BaseStepsGenerator):
+    """
+    A regular steps generator that outputs experiences of playing the environment.
+    """
+
     def __init__(self, env, action_selector: BaseActionSelector):
         super().__init__(env, action_selector)
 
@@ -49,7 +57,13 @@ class SimpleStepsGenerator(BaseStepsGenerator):
 
 
 class CompressedStepsGenerator(BaseStepsGenerator):
+    """
+    A generalized steps generator that is equivalent to SimpleStepsGenerator for n_steps=1. In other cases, it unfolds
+    Bellman-Ford equation (discounting the subsequent rewards).
+    """
+
     def __init__(self, env, action_selector: BaseActionSelector, n_steps=1, gamma=1):
+        assert n_steps >= 1
         super().__init__(env, action_selector)
         self._gamma = gamma
         self._n_steps = n_steps

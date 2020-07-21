@@ -58,7 +58,6 @@ class REINFORCE(AgentTraining):
 
                 self._plotter.add_scalar("Total reward per episode", reward_sum, episode_idx)
                 print(f"At step {idx}, \t the average over the last 100 games is {sum(last_episodes_rewards)/100}")
-                x = sum(last_episodes_rewards)/100
 
                 reward_sum = 0
 

@@ -5,6 +5,10 @@ from action_selectors import BaseActionSelector
 
 
 class AgentTraining(ABC):
+    """
+    Base class for classes implementing various training algorithms.
+    """
+
     @abstractmethod
     def __init__(self):
         self._env = self.get_environment()

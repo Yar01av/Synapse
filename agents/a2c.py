@@ -17,10 +17,8 @@ def unpack(transitions, model, gamma, unfolding_steps):
     t_reward = FloatTensor([t.reward for t in transitions]).cuda()
 
     # Calculate the Q values
-    x = (1-t_done)
-    y = model(t_new_states)[1].view(-1)
-    z = y*x
-    t_qvals = t_reward + (gamma**unfolding_steps)*z
+    t_next_states_values_predictions = model(t_new_states)[1].view(-1)*(1-t_done)
+    t_qvals = t_reward + (gamma**unfolding_steps)*t_next_states_values_predictions
 
     return t_old_states, t_acts, t_qvals.detach()
 
@@ -62,6 +60,7 @@ class A2C(AgentTraining):
         cuda.set_device(0)
         self._model = SimpleA2CNetwork(self._env.observation_space.shape[0], self._env.action_space.n).cuda()
         self._optimizer = Adam(params=self._model.parameters(), lr=lr)
+                               #, eps=1e-3)
         self._memory = list()
 
         # Logging related
