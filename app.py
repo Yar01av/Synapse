@@ -20,12 +20,11 @@ set_random_seed(123)
 torch.manual_seed(0)
 
 # Uncomment for a proper agent
-training_class = A2C
-training_instance = training_class(max_training_steps=2000000)
-env = training_class.get_environment()
+training = A2C(max_training_steps=2000000, n_envs=10)
+env = training.get_environment()
 
-training_instance.train("checkpoint.h5")
-selector = training_class.load_selector(load_path="checkpoint.h5")
+training.train("checkpoint.h5")
+selector = training.load_selector(load_path="checkpoint.h5")
 
 # Uncomment for a random baseline
 # env = gym.make("CartPole-v1")

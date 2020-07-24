@@ -14,6 +14,7 @@ class REINFORCE(AgentTraining):
     def __init__(self, gamma=0.99, beta=0.01, lr=0.01, batch_size=10, max_training_steps=1000, desired_avg_reward=500):
         super().__init__()
 
+        self._env = self.get_environment()
         self._desired_avg_reward = desired_avg_reward
         self._beta = beta
         self._n_training_steps = max_training_steps
@@ -28,7 +29,8 @@ class REINFORCE(AgentTraining):
         self._memory = CompositeMemory()
 
         # Logging related
-        self._plotter = SummaryWriter(comment="xREINFORCE")
+        SummaryWriter(comment=f"x{self.__class__.__name__}").close()
+        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
 
     def train(self, save_path):
         steps_generator = CompressedStepsGenerator(self._env,
@@ -36,7 +38,6 @@ class REINFORCE(AgentTraining):
 
         batch_count = 0
         last_episodes_rewards = deque(maxlen=100)
-        reward_sum = 0
         episode_idx = 0
 
         for idx, transition in enumerate(steps_generator):
@@ -44,7 +45,6 @@ class REINFORCE(AgentTraining):
                 save(self._model, save_path)
                 break
 
-            reward_sum += transition.reward
             self._memory.states.append(transition.previous_state)
             self._memory.actions.append(transition.action)
             self._memory.rewards.append(transition.reward)
@@ -54,12 +54,12 @@ class REINFORCE(AgentTraining):
                 episode_idx += 1
 
                 self._memory.compute_qvals(self._gamma)
-                last_episodes_rewards.append(reward_sum)
 
-                self._plotter.add_scalar("Total reward per episode", reward_sum, episode_idx)
+                new_rewards = steps_generator.pop_per_episode_rewards()
+                assert len(new_rewards) == 1
+                last_episodes_rewards.extend(new_rewards)
+                self._plotter.add_scalar("Total reward per episode", new_rewards[0], episode_idx)
                 print(f"At step {idx}, \t the average over the last 100 games is {sum(last_episodes_rewards)/100}")
-
-                reward_sum = 0
 
             if batch_count == self._batch_size:
                 t_act = LongTensor(self._memory.actions).cuda()

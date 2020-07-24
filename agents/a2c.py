@@ -5,7 +5,7 @@ from torch.optim import Adam
 from action_selectors import ProbValuePolicySelector, BaseActionSelector
 from agents.agent_training import AgentTraining
 from memory import CompositeMemory
-from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator
+from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator, MultiEnvCompressedStepsGenerator
 import torch.nn.functional as F
 
 
@@ -33,7 +33,9 @@ class SimpleA2CNetwork(nn.Module):
         )
 
         self._value_head = nn.Sequential(
-            nn.Linear(128, 1)
+            nn.Linear(128, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
         )
 
         self._policy_head = nn.Sequential(
@@ -47,9 +49,10 @@ class SimpleA2CNetwork(nn.Module):
 
 class A2C(AgentTraining):
     def __init__(self, gamma=0.99, beta=0.01, lr=0.001, batch_size=8, max_training_steps=1000, desired_avg_reward=500,
-                 unfolding_steps=3):
+                 unfolding_steps=2, n_envs=1):
         super().__init__()
 
+        self._n_envs = n_envs
         self._unfolding_steps = unfolding_steps
         self._desired_avg_reward = desired_avg_reward
         self._beta = beta
@@ -58,21 +61,21 @@ class A2C(AgentTraining):
         self._lr = lr
         self._gamma = gamma
         cuda.set_device(0)
-        self._model = SimpleA2CNetwork(self._env.observation_space.shape[0], self._env.action_space.n).cuda()
+        self._memory = list()
+
+        self._ref_env = self.get_environment()  # Reference environment should not be actually used to play episodes.
+        self._model = SimpleA2CNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n).cuda()
         self._optimizer = Adam(params=self._model.parameters(), lr=lr)
                                #, eps=1e-3)
-        self._memory = list()
 
         # Logging related
         self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
 
     def train(self, save_path):
-        steps_generator = CompressedStepsGenerator(self._env,
-                                                   ProbValuePolicySelector(self._env.action_space.n, model=self._model),
+        steps_generator = MultiEnvCompressedStepsGenerator([self.get_environment() for i in range (self._n_envs)],
+                                                   ProbValuePolicySelector(self._ref_env.action_space.n, model=self._model),
                                                    n_steps=self._unfolding_steps, gamma=self._gamma)
-        batch_count = 0
         last_episodes_rewards = deque(maxlen=100)
-        reward_sum = 0
         episode_idx = 0
 
         for idx, transition in enumerate(steps_generator):
@@ -80,15 +83,16 @@ class A2C(AgentTraining):
                 save(self._model, save_path)
                 break
 
-            reward_sum += sum(transition.sub_rewards)
             self._memory.append(transition)
 
             if transition.done:
                 episode_idx += 1
-                last_episodes_rewards.append(reward_sum)
-                self._plotter.add_scalar("Total reward per episode", reward_sum, episode_idx)
+
+                new_rewards = steps_generator.pop_per_episode_rewards()
+                assert len(new_rewards) == 1
+                last_episodes_rewards.extend(new_rewards)
+                self._plotter.add_scalar("Total reward per episode", new_rewards[0], episode_idx)
                 print(f"At step {idx}, \t the average over the last 100 games is {sum(last_episodes_rewards)/100}")
-                reward_sum = 0
 
             if len(self._memory) == self._batch_size:
 
@@ -117,8 +121,9 @@ class A2C(AgentTraining):
                 self._memory.clear()
 
                 # Plot
-                self._plotter.add_scalar("Entropy", entropy.item(), episode_idx)
-                self._plotter.add_scalar("KL Divergence", kl_divergence.item(), episode_idx)
+                self._plotter.add_scalar("Combined Loss", (policy_loss+value_loss-self._beta*entropy).item(), idx)
+                self._plotter.add_scalar("Entropy", entropy.item(), idx)
+                self._plotter.add_scalar("KL Divergence", kl_divergence.item(), idx)
 
         self._plotter.close()
 

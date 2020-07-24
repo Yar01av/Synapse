@@ -11,7 +11,7 @@ class AgentTraining(ABC):
 
     @abstractmethod
     def __init__(self):
-        self._env = self.get_environment()
+        pass
 
     @abstractmethod
     def train(self, save_path):
