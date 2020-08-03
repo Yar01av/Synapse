@@ -1,5 +1,6 @@
 from collections import deque
 
+import gym
 from torch.optim import Adam
 from tensorboardX import SummaryWriter
 
@@ -94,3 +95,7 @@ class REINFORCE(AgentTraining):
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
         return SimplePolicySelector(action_space_size=cls.get_environment().action_space.n, model=load(load_path))
+
+    @classmethod
+    def get_environment(cls):
+        return gym.make("LunarLander-v2")

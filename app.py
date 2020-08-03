@@ -4,7 +4,7 @@ from random import seed
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 import torch
-from tensorflow import set_random_seed
+#from tensorflow import set_random_seed
 
 from agents.a2c import A2C
 from agents.reinforce import REINFORCE
@@ -16,11 +16,12 @@ MAX_EPISODE_LENGTH = 500
 
 # Seed to make sure that the results are reproducible
 seed(1)
-set_random_seed(123)
+#set_random_seed(123)
 torch.manual_seed(0)
 
 # Uncomment for a proper agent
-training = A2C(max_training_steps=2000000, n_envs=10)
+training = A2C(max_training_steps=3_000_000, n_envs=10, unfolding_steps=10, desired_avg_reward=200, lr=0.001, batch_size=4)
+#training = REINFORCE(max_training_steps=200000, desired_avg_reward=180)
 env = training.get_environment()
 
 training.train("checkpoint.h5")

@@ -1,10 +1,13 @@
 from collections import deque
+
+import gym
 from tensorboardX import SummaryWriter
 from torch import cuda, nn, load, save, LongTensor, FloatTensor
 from torch.optim import Adam
 from action_selectors import ProbValuePolicySelector, BaseActionSelector
 from agents.agent_training import AgentTraining
 from memory import CompositeMemory
+import torch.nn.utils as nn_utils
 from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator, MultiEnvCompressedStepsGenerator
 import torch.nn.functional as F
 
@@ -33,23 +36,25 @@ class SimpleA2CNetwork(nn.Module):
         )
 
         self._value_head = nn.Sequential(
-            nn.Linear(128, 32),
+            nn.Linear(state_size, 128),
             nn.ReLU(),
-            nn.Linear(32, 1)
+            nn.Linear(128, 1)
         )
 
         self._policy_head = nn.Sequential(
+            nn.Linear(state_size, 128),
+            nn.ReLU(),
             nn.Linear(128, n_actions)
         )
 
     def forward(self, x):
-        base_output = self._base(x)
-        return self._policy_head(base_output), self._value_head(base_output)
+        #base_output = self._base(x)
+        return self._policy_head(x), self._value_head(x)
 
 
 class A2C(AgentTraining):
     def __init__(self, gamma=0.99, beta=0.01, lr=0.001, batch_size=8, max_training_steps=1000, desired_avg_reward=500,
-                 unfolding_steps=2, n_envs=1):
+                 unfolding_steps=2, n_envs=1, clip_grad=0.1):
         super().__init__()
 
         self._n_envs = n_envs
@@ -62,6 +67,7 @@ class A2C(AgentTraining):
         self._gamma = gamma
         cuda.set_device(0)
         self._memory = list()
+        self._clip_grad = clip_grad
 
         self._ref_env = self.get_environment()  # Reference environment should not be actually used to play episodes.
         self._model = SimpleA2CNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n).cuda()
@@ -112,6 +118,7 @@ class A2C(AgentTraining):
                 old_probs = t_logits.softmax(dim=1)
 
                 (policy_loss+value_loss-self._beta*entropy).backward()
+                nn_utils.clip_grad_norm_(self._model.parameters(), self._clip_grad)
                 self._optimizer.step()
 
                 # Compute KL divergence
@@ -130,3 +137,7 @@ class A2C(AgentTraining):
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
         return ProbValuePolicySelector(action_space_size=cls.get_environment().action_space.n, model=load(load_path))
+
+    @classmethod
+    def get_environment(cls):
+        return gym.make("LunarLander-v2")
