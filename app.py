@@ -7,6 +7,7 @@ import torch
 #from tensorflow import set_random_seed
 
 from agents.a2c import A2C
+from agents.a2c_conv import A2CConv
 from agents.reinforce import REINFORCE
 
 
@@ -20,12 +21,17 @@ seed(1)
 torch.manual_seed(0)
 
 # Uncomment for a proper agent
-training = A2C(max_training_steps=3_000_000, n_envs=10, unfolding_steps=10, desired_avg_reward=200, lr=0.001, batch_size=4)
+training = A2C(max_training_steps=100,
+                   n_envs=50,
+                   unfolding_steps=4,
+                   desired_avg_reward=200,
+                   lr=0.001,
+                   batch_size=128)
 #training = REINFORCE(max_training_steps=200000, desired_avg_reward=180)
 env = training.get_environment()
 
-training.train("checkpoint.h5")
-selector = training.load_selector(load_path="checkpoint.h5")
+training.train("checkpoint2.h5")
+selector = training.load_selector(load_path="checkpoint2.h5")
 
 # Uncomment for a random baseline
 # env = gym.make("CartPole-v1")

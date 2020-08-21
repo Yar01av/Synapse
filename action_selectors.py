@@ -4,6 +4,8 @@ import random
 import numpy as np
 from torch import FloatTensor, no_grad
 
+from util import select_index_from_probs
+
 
 class BaseActionSelector(ABC):
     """
@@ -15,10 +17,11 @@ class BaseActionSelector(ABC):
         pass
 
     @abstractmethod
-    def pick(self, state):
+    def pick(self, state, is_batch=False):
         """
         Returns a valid action.
 
+        :param is_batch: Does state contain a batch of states?
         :param state: State in which the action is required
         :return:
         """
@@ -37,10 +40,13 @@ class SimplePolicySelector(BaseActionSelector):
         self._action_space_size = action_space_size
 
     @no_grad()
-    def pick(self, state):
+    def pick(self, state, is_batch=False):
         probs = self._model(FloatTensor(state).cuda()).softmax(dim=0)
 
-        return np.random.choice(range(self._action_space_size), p=np.squeeze(probs.cpu().detach().numpy()))
+        if is_batch:
+            return select_index_from_probs(probs.item())
+        else:
+            return np.random.choice(range(self._action_space_size), p=np.squeeze(probs.cpu().detach().numpy()))
 
 
 class RandomDiscreteSelector(BaseActionSelector):
@@ -53,7 +59,11 @@ class RandomDiscreteSelector(BaseActionSelector):
         super().__init__()
         self._n_actions = n_actions
 
-    def pick(self, state):
+    def pick(self, state, is_batch=False):
+        # TODO: implement vectorized random action selection
+        if is_batch:
+            raise NotImplementedError()
+
         return random.choice(range(self._n_actions))
 
 
@@ -69,7 +79,13 @@ class ProbValuePolicySelector(BaseActionSelector):
         self._action_space_size = action_space_size
 
     @no_grad()
-    def pick(self, state):
-        probs = self._model(FloatTensor(state).cuda())[0].softmax(dim=0)
-
-        return np.random.choice(range(self._action_space_size), p=np.squeeze(probs.cpu().detach().numpy()))
+    def pick(self, state, is_batch=False):
+        if is_batch:
+            probs = self._model(FloatTensor(np.array([np.array(s, copy=False) for s in state], copy=False))
+                        .cuda())[0]\
+                        .softmax(dim=-1)
+            return select_index_from_probs(probs.cpu().numpy())
+        else:
+            probs = self._model(FloatTensor(np.array(state)).cuda().unsqueeze(0))[0]\
+                        .softmax(dim=-1)
+            return np.random.choice(range(self._action_space_size), p=np.squeeze(probs.cpu().detach().numpy()))

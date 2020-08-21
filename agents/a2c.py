@@ -12,37 +12,23 @@ from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator, Mul
 import torch.nn.functional as F
 
 
-def unpack(transitions, model, gamma, unfolding_steps):
-    t_acts = LongTensor([t.action for t in transitions]).cuda()
-    t_old_states = FloatTensor([t.previous_state for t in transitions]).cuda()
-    t_new_states = FloatTensor([t.next_state for t in transitions]).cuda()
-    t_done = LongTensor([t.done for t in transitions]).cuda()
-    t_reward = FloatTensor([t.reward for t in transitions]).cuda()
-
-    # Calculate the Q values
-    t_next_states_values_predictions = model(t_new_states)[1].view(-1)*(1-t_done)
-    t_qvals = t_reward + (gamma**unfolding_steps)*t_next_states_values_predictions
-
-    return t_old_states, t_acts, t_qvals.detach()
-
-
-class SimpleA2CNetwork(nn.Module):
-    def __init__(self, state_size, n_actions):
+class A2CNetwork(nn.Module):
+    def __init__(self, input_shape, n_actions):
         super().__init__()
 
         self._base = nn.Sequential(
-            nn.Linear(state_size, 128),
+            nn.Linear(input_shape, 128),
             nn.ReLU()
         )
 
         self._value_head = nn.Sequential(
-            nn.Linear(state_size, 128),
+            nn.Linear(input_shape, 128),
             nn.ReLU(),
             nn.Linear(128, 1)
         )
 
         self._policy_head = nn.Sequential(
-            nn.Linear(state_size, 128),
+            nn.Linear(input_shape, 128),
             nn.ReLU(),
             nn.Linear(128, n_actions)
         )
@@ -70,7 +56,7 @@ class A2C(AgentTraining):
         self._clip_grad = clip_grad
 
         self._ref_env = self.get_environment()  # Reference environment should not be actually used to play episodes.
-        self._model = SimpleA2CNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n).cuda()
+        self._model = A2CNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n).cuda()
         self._optimizer = Adam(params=self._model.parameters(), lr=lr)
                                #, eps=1e-3)
 
@@ -85,7 +71,7 @@ class A2C(AgentTraining):
         episode_idx = 0
 
         for idx, transition in enumerate(steps_generator):
-            if idx == self._n_training_steps-1 or self._desired_avg_reward <= sum(last_episodes_rewards)/100:
+            if idx == self._n_training_steps-1 or self._desired_avg_reward <= min(len(last_episodes_rewards), 100):
                 save(self._model, save_path)
                 break
 
@@ -98,11 +84,12 @@ class A2C(AgentTraining):
                 assert len(new_rewards) == 1
                 last_episodes_rewards.extend(new_rewards)
                 self._plotter.add_scalar("Total reward per episode", new_rewards[0], episode_idx)
-                print(f"At step {idx}, \t the average over the last 100 games is {sum(last_episodes_rewards)/100}")
+                print(f"At step {idx}, \t the average over the last 100 games is "
+                      f"{sum(last_episodes_rewards)/min(len(last_episodes_rewards), 100)}")
 
             if len(self._memory) == self._batch_size:
 
-                t_states, t_actions, t_qvals = unpack(self._memory, self._model, self._gamma, self._unfolding_steps)
+                t_states, t_actions, t_qvals = self._unpack(self._memory, self._model, self._gamma, self._unfolding_steps)
 
                 self._optimizer.zero_grad()
                 t_logits = self._model(t_states)[0]
@@ -133,6 +120,20 @@ class A2C(AgentTraining):
                 self._plotter.add_scalar("KL Divergence", kl_divergence.item(), idx)
 
         self._plotter.close()
+
+    @staticmethod
+    def _unpack(transitions, model, gamma, unfolding_steps):
+        t_acts = LongTensor([t.action for t in transitions]).cuda()
+        t_old_states = FloatTensor([t.previous_state for t in transitions]).cuda()
+        t_new_states = FloatTensor([t.next_state for t in transitions]).cuda()
+        t_done = LongTensor([t.done for t in transitions]).cuda()
+        t_reward = FloatTensor([t.reward for t in transitions]).cuda()
+
+        # Calculate the Q values
+        t_next_states_values_predictions = model(t_new_states)[1].view(-1)*(1-t_done)
+        t_qvals = t_reward + (gamma**unfolding_steps)*t_next_states_values_predictions
+
+        return t_old_states, t_acts, t_qvals.detach()
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:

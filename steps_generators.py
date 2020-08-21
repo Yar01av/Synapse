@@ -159,13 +159,16 @@ class MultiEnvCompressedStepsGenerator(BaseStepsGenerator):
         reward_sums = [0]*self._n_envs
         episode_idxs = [0]*self._n_envs
         discounted_rewards = [0]*self._n_envs
+        actions = []
 
         while True:
             env_idx = step_idx%self._n_envs
-            # TODO: speed up by vectorizing the ".pick"
-            action = self._action_selector.pick(former_states[env_idx])
-            next_state, reward, done, _ = self._envs[env_idx].step(action)
-            steps[env_idx].append(Transition(state=former_states[env_idx], action=action, reward=reward))
+
+            if env_idx == 0:
+                actions = self._action_selector.pick(former_states, is_batch=True)
+
+            next_state, reward, done, _ = self._envs[env_idx].step(actions[env_idx])
+            steps[env_idx].append(Transition(state=former_states[env_idx], action=actions[env_idx], reward=reward))
 
             former_states[env_idx] = next_state
             reward_sums[env_idx] += reward
