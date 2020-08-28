@@ -29,19 +29,26 @@ class BaseActionSelector(ABC):
         pass
 
 
-class SimplePolicySelector(BaseActionSelector):
+class ModelBasedActionSelector(BaseActionSelector, ABC):
+    @abstractmethod
+    def __init__(self, model):
+        super().__init__()
+        self._model = model
+        self._model_device = "cuda" if next(self._model.parameters()).is_cuda else "cpu"
+
+
+class SimplePolicySelector(ModelBasedActionSelector):
     """
     Action selector for models trained to return probabilities (as logits).
     """
 
     def __init__(self, action_space_size, model):
-        super().__init__()
-        self._model = model
+        super().__init__(model)
         self._action_space_size = action_space_size
 
     @no_grad()
     def pick(self, state, is_batch=False):
-        probs = self._model(FloatTensor(state).cuda()).softmax(dim=0)
+        probs = self._model(FloatTensor(state).to(self._model_device)).softmax(dim=0)
 
         if is_batch:
             return select_index_from_probs(probs.item())
@@ -67,25 +74,24 @@ class RandomDiscreteSelector(BaseActionSelector):
         return random.choice(range(self._n_actions))
 
 
-class ProbValuePolicySelector(BaseActionSelector):
+class ProbValuePolicySelector(ModelBasedActionSelector):
     """
     Similar to SimplePolicySelector, but assumes that the model's second head returns the action probabilities
     (as logits).
     """
 
     def __init__(self, action_space_size, model):
-        super().__init__()
-        self._model = model
+        super().__init__(model)
         self._action_space_size = action_space_size
 
     @no_grad()
     def pick(self, state, is_batch=False):
         if is_batch:
             probs = self._model(FloatTensor(np.array([np.array(s, copy=False) for s in state], copy=False))
-                        .cuda())[0]\
+                        .to(self._model_device))[0]\
                         .softmax(dim=-1)
             return select_index_from_probs(probs.cpu().numpy())
         else:
-            probs = self._model(FloatTensor(np.array(state)).cuda().unsqueeze(0))[0]\
+            probs = self._model(FloatTensor(np.array(state)).to(self._model_device).unsqueeze(0))[0]\
                         .softmax(dim=-1)
             return np.random.choice(range(self._action_space_size), p=np.squeeze(probs.cpu().detach().numpy()))

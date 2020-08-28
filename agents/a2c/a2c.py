@@ -11,6 +11,8 @@ import torch.nn.utils as nn_utils
 from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator, MultiEnvCompressedStepsGenerator
 import torch.nn.functional as F
 
+from util import unpack
+
 
 class A2CNetwork(nn.Module):
     def __init__(self, input_shape, n_actions):
@@ -40,7 +42,7 @@ class A2CNetwork(nn.Module):
 
 class A2C(AgentTraining):
     def __init__(self, gamma=0.99, beta=0.01, lr=0.001, batch_size=8, max_training_steps=1000, desired_avg_reward=500,
-                 unfolding_steps=2, n_envs=1, clip_grad=0.1):
+                 unfolding_steps=4, n_envs=1, clip_grad=0.1):
         super().__init__()
 
         self._n_envs = n_envs
@@ -71,7 +73,9 @@ class A2C(AgentTraining):
         episode_idx = 0
 
         for idx, transition in enumerate(steps_generator):
-            if idx == self._n_training_steps-1 or self._desired_avg_reward <= min(len(last_episodes_rewards), 100):
+            if idx == self._n_training_steps-1 or \
+                     (self._desired_avg_reward <= sum(last_episodes_rewards)/len(last_episodes_rewards)
+                     if len(last_episodes_rewards) >= 100 else False):
                 save(self._model, save_path)
                 break
 
@@ -89,7 +93,11 @@ class A2C(AgentTraining):
 
             if len(self._memory) == self._batch_size:
 
-                t_states, t_actions, t_qvals = self._unpack(self._memory, self._model, self._gamma, self._unfolding_steps)
+                t_states, t_actions, t_qvals = unpack(self._memory,
+                                                      self._model,
+                                                      self._gamma,
+                                                      self._unfolding_steps,
+                                                      "cuda")
 
                 self._optimizer.zero_grad()
                 t_logits = self._model(t_states)[0]
@@ -121,24 +129,10 @@ class A2C(AgentTraining):
 
         self._plotter.close()
 
-    @staticmethod
-    def _unpack(transitions, model, gamma, unfolding_steps):
-        t_acts = LongTensor([t.action for t in transitions]).cuda()
-        t_old_states = FloatTensor([t.previous_state for t in transitions]).cuda()
-        t_new_states = FloatTensor([t.next_state for t in transitions]).cuda()
-        t_done = LongTensor([t.done for t in transitions]).cuda()
-        t_reward = FloatTensor([t.reward for t in transitions]).cuda()
-
-        # Calculate the Q values
-        t_next_states_values_predictions = model(t_new_states)[1].view(-1)*(1-t_done)
-        t_qvals = t_reward + (gamma**unfolding_steps)*t_next_states_values_predictions
-
-        return t_old_states, t_acts, t_qvals.detach()
-
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
         return ProbValuePolicySelector(action_space_size=cls.get_environment().action_space.n, model=load(load_path))
 
     @classmethod
     def get_environment(cls):
-        return gym.make("LunarLander-v2")
+        return gym.make("CartPole-v1")

@@ -6,10 +6,9 @@ from random import seed
 import torch
 #from tensorflow import set_random_seed
 
-from agents.a2c import A2C
-from agents.a2c_conv import A2CConv
-from agents.reinforce import REINFORCE
-
+from agents.a2c.a2c import A2C
+from agents.a3c.a3c_dist_env import A3C
+from agents.reinforce.reinforce import REINFORCE
 
 N_EPISODES = 10
 MAX_EPISODE_LENGTH = 500
@@ -21,8 +20,8 @@ seed(1)
 torch.manual_seed(0)
 
 # Uncomment for a proper agent
-training = A2C(max_training_steps=100,
-                   n_envs=50,
+training = A3C(max_training_steps=10000000,
+                   envs_per_thread=50,
                    unfolding_steps=4,
                    desired_avg_reward=200,
                    lr=0.001,
@@ -30,26 +29,27 @@ training = A2C(max_training_steps=100,
 #training = REINFORCE(max_training_steps=200000, desired_avg_reward=180)
 env = training.get_environment()
 
-training.train("checkpoint2.h5")
-selector = training.load_selector(load_path="checkpoint2.h5")
+if __name__ == "__main__":
+    training.train("checkpoint2.h5")
+    selector = training.load_selector(load_path="checkpoint2.h5")
 
-# Uncomment for a random baseline
-# env = gym.make("CartPole-v1")
-# selector = RandomDiscreteSelector(env.action_space.n)
+    # Uncomment for a random baseline
+    # env = gym.make("CartPole-v1")
+    # selector = RandomDiscreteSelector(env.action_space.n)
 
-# The game loop
-for episode_idx in range(N_EPISODES):
-    current_state = env.reset()
-    sum = 0
+    # The game loop
+    for episode_idx in range(N_EPISODES):
+        current_state = env.reset()
+        sum = 0
 
-    for step_idx in range(MAX_EPISODE_LENGTH):
-        env.render()
-        action = selector.pick(current_state)
-        current_state, reward, done, _ = env.step(action)
-        sum += reward
-
-        if done or step_idx == MAX_EPISODE_LENGTH-1:
+        for step_idx in range(MAX_EPISODE_LENGTH):
             env.render()
-            break
+            action = selector.pick(current_state)
+            current_state, reward, done, _ = env.step(action)
+            sum += reward
 
-    print(f"At episode {episode_idx}, \t the reward is {sum}")
+            if done or step_idx == MAX_EPISODE_LENGTH-1:
+                env.render()
+                break
+
+        print(f"At episode {episode_idx}, \t the reward is {sum}")
