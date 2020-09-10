@@ -19,17 +19,15 @@ seed(1)
 #set_random_seed(123)
 torch.manual_seed(0)
 
-# Uncomment for a proper agent
-training = A3C(max_training_steps=10000000,
-                   envs_per_thread=50,
-                   unfolding_steps=4,
-                   desired_avg_reward=200,
-                   lr=0.001,
-                   batch_size=128)
-#training = REINFORCE(max_training_steps=200000, desired_avg_reward=180)
-env = training.get_environment()
-
 if __name__ == "__main__":
+    # Uncomment for a proper agent
+    training = REINFORCE(max_training_steps=10_000_000,
+                   desired_avg_reward=500,
+                   lr=0.001,
+                   batch_size=4)
+    # training = REINFORCE(max_training_steps=200000, desired_avg_reward=180)
+    env = training.get_environment()
+
     training.train("checkpoint2.h5")
     selector = training.load_selector(load_path="checkpoint2.h5")
 

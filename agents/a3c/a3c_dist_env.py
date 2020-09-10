@@ -2,7 +2,7 @@ from collections import deque
 
 import gym
 from tensorboardX import SummaryWriter
-from torch import load, cuda, save, nn
+from torch import load, cuda, save, nn, tensor, isnan
 from torch.optim import Adam
 import torch.multiprocessing as mp
 from action_selectors import BaseActionSelector, ProbValuePolicySelector
@@ -15,11 +15,10 @@ import torch.nn.functional as F
 from util import unpack
 
 
-def env_maker(): return gym.make("CartPole-v1")
+def env_maker(): return gym.make("LunarLander-v2")
 
 
 def child_process(queue, envs_per_thread, n_actions, model, n_steps, gamma):
-    # TODO do I need the network as an argument
     steps_generator = MultiEnvCompressedStepsGenerator([env_maker() for _ in range(envs_per_thread)],
                                                         ProbValuePolicySelector(n_actions, model=model),
                                                         n_steps=n_steps, gamma=gamma)
@@ -68,10 +67,12 @@ class A3C(AgentTraining):
     # TODO: more gpu
 
     def __init__(self, gamma=0.99, beta=0.01, lr=0.001, batch_size=8, max_training_steps=1000, desired_avg_reward=500,
-                 unfolding_steps=2, envs_per_thread=1, clip_grad=0.1, n_threads=8):
+                 unfolding_steps=2, envs_per_thread=1, clip_grad=0.1, n_processes=8):
         super().__init__()
 
-        self._n_threads = n_threads
+        mp.set_start_method('spawn')
+
+        self._n_threads = n_processes
         self._envs_per_thread = envs_per_thread
         self._unfolding_steps = unfolding_steps
         self._desired_avg_reward = desired_avg_reward
@@ -86,8 +87,7 @@ class A3C(AgentTraining):
         self._ref_env = self.get_environment()  # Reference environment should not be actually used to play episodes.
         self._model = A3CNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n)
         self._model.share_memory()
-        self._optimizer = Adam(params=self._model.parameters(), lr=lr)
-        #, eps=1e-3)
+        self._optimizer = Adam(params=self._model.parameters(), lr=lr, eps=1e-3)
 
         # Logging related
         self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
@@ -128,10 +128,9 @@ class A3C(AgentTraining):
                     self._plotter.add_scalar("Total reward per episode", exp, episode_idx)
                     print(f"At step {step_idx}, \t the average over the last 100 games is "
                           f"{sum(last_episodes_rewards)/min(len(last_episodes_rewards), 100)}")
-
-                    episode_idx += 1
                     continue
                 else:
+                    episode_idx += 1
                     self._memory.append(exp)
 
                 if len(self._memory) == self._batch_size:
@@ -142,25 +141,28 @@ class A3C(AgentTraining):
                                                           "cpu")
 
                     self._optimizer.zero_grad()
-                    t_logits = self._model(t_states)[0]
+                    t_logits, t_values = self._model(t_states)
+                    t_log_probs = t_logits.log_softmax(dim=1)
+                    t_probs = t_logits.softmax(dim=1)
+
+                    # Compute the value loss
+                    value_loss = F.mse_loss(t_values.squeeze(-1), t_qvals)
 
                     # Compute the policy loss
-                    t_values = self._model(t_states)[1]
                     t_advantages = t_qvals - t_values.detach()
-                    policy_loss = -(t_advantages*t_logits.log_softmax(dim=1)[range(len(t_states)), t_actions]).mean()
-                    # Compute the value loss
-                    value_loss = F.mse_loss(t_values.view(len(t_qvals)), t_qvals)
-                    # Compute the entropy and record the original probabilities for later
-                    entropy = -(t_logits.softmax(dim=1)*t_logits.log_softmax(dim=1)).sum(dim=1).mean()
-                    old_probs = t_logits.softmax(dim=1)
+                    policy_loss = -(t_advantages * t_log_probs[range(self._batch_size), t_actions]).mean()
 
-                    (policy_loss+value_loss-self._beta*entropy).backward()
+                    # Compute the entropy and record the original probabilities for later
+                    entropy = -(t_probs * t_log_probs).sum(dim=1).mean()
+                    old_probs = t_probs
+
+                    (policy_loss + value_loss - self._beta * entropy).backward()
                     nn_utils.clip_grad_norm_(self._model.parameters(), self._clip_grad)
                     self._optimizer.step()
 
                     # Compute KL divergence
                     new_probs = self._model(t_states)[0].softmax(dim=1)
-                    kl_divergence = -((new_probs/old_probs).log()*old_probs).sum(dim=1).mean()
+                    kl_divergence = -((new_probs / old_probs).log() * old_probs).sum(dim=1).mean()
 
                     self._memory.clear()
 

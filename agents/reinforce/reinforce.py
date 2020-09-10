@@ -98,4 +98,4 @@ class REINFORCE(AgentTraining):
 
     @classmethod
     def get_environment(cls):
-        return gym.make("LunarLander-v2")
+        return gym.make("CartPole-v1")

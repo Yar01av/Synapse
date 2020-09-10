@@ -59,8 +59,7 @@ class A2C(AgentTraining):
 
         self._ref_env = self.get_environment()  # Reference environment should not be actually used to play episodes.
         self._model = A2CNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n).cuda()
-        self._optimizer = Adam(params=self._model.parameters(), lr=lr)
-                               #, eps=1e-3)
+        self._optimizer = Adam(params=self._model.parameters(), lr=lr, eps=1e-3)
 
         # Logging related
         self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
@@ -100,17 +99,20 @@ class A2C(AgentTraining):
                                                       "cuda")
 
                 self._optimizer.zero_grad()
-                t_logits = self._model(t_states)[0]
+                t_logits, t_values = self._model(t_states)
+                t_log_probs = t_logits.log_softmax(dim=1)
+                t_probs = t_logits.softmax(dim=1)
+
+                # Compute the value loss
+                value_loss = F.mse_loss(t_values.squeeze(-1), t_qvals)
 
                 # Compute the policy loss
-                t_values = self._model(t_states)[1]
                 t_advantages = t_qvals - t_values.detach()
-                policy_loss = -(t_advantages*t_logits.log_softmax(dim=1)[range(len(t_states)), t_actions]).mean()
-                # Compute the value loss
-                value_loss = F.mse_loss(t_values.view(len(t_qvals)), t_qvals)
+                policy_loss = -(t_advantages*t_log_probs[range(self._batch_size), t_actions]).mean()
+
                 # Compute the entropy and record the original probabilities for later
-                entropy = -(t_logits.softmax(dim=1)*t_logits.log_softmax(dim=1)).sum(dim=1).mean()
-                old_probs = t_logits.softmax(dim=1)
+                entropy = -(t_probs*t_log_probs).sum(dim=1).mean()
+                old_probs = t_probs
 
                 (policy_loss+value_loss-self._beta*entropy).backward()
                 nn_utils.clip_grad_norm_(self._model.parameters(), self._clip_grad)
