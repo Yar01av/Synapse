@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from util import unpack
 
 
-def env_maker(): return gym.make("LunarLander-v2")
+def env_maker(): return gym.make("CartPole-v1")
 
 
 def child_process(queue, envs_per_thread, n_actions, model, n_steps, gamma):
@@ -72,7 +72,7 @@ class A3C(AgentTraining):
 
         mp.set_start_method('spawn')
 
-        self._n_threads = n_processes
+        self._n_processes = n_processes
         self._envs_per_thread = envs_per_thread
         self._unfolding_steps = unfolding_steps
         self._desired_avg_reward = desired_avg_reward
@@ -97,11 +97,11 @@ class A3C(AgentTraining):
         episode_idx = 0
         step_idx = 0
         # TODO try batch count
-        train_queue = mp.Queue(maxsize=self._n_threads)
+        train_queue = mp.Queue(maxsize=self._n_processes)
         processes = []
 
         # Spawn the processes
-        for _ in range(self._n_threads):
+        for _ in range(self._n_processes):
             process = mp.Process(target=child_process, args=(train_queue,
                                                              self._envs_per_thread,
                                                              self.get_environment().action_space.n,
@@ -157,7 +157,7 @@ class A3C(AgentTraining):
                     old_probs = t_probs
 
                     (policy_loss + value_loss - self._beta * entropy).backward()
-                    nn_utils.clip_grad_norm_(self._model.parameters(), self._clip_grad)
+                    #nn_utils.clip_grad_norm_(self._model.parameters(), self._clip_grad)
                     self._optimizer.step()
 
                     # Compute KL divergence
