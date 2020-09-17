@@ -21,14 +21,13 @@ torch.manual_seed(0)
 
 if __name__ == "__main__":
     # Uncomment for a proper agent
-    training = A3C(max_training_steps=10_000_000,
+    training = A2C(max_training_steps=10_000_000,
                    desired_avg_reward=500,
                    unfolding_steps=4,
-                   envs_per_thread=1,
+                   n_envs=1,
                    lr=0.001,
                    clip_grad=1000,
-                   batch_size=8,
-                   n_processes=6)
+                   batch_size=8)
     # training = REINFORCE(max_training_steps=200000, desired_avg_reward=180)
     env = training.get_environment()
 

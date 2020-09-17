@@ -4,7 +4,7 @@ import gym
 from tensorboardX import SummaryWriter
 from torch import cuda, nn, load, save, LongTensor, FloatTensor
 from torch.optim import Adam
-from action_selectors import ProbValuePolicySelector, BaseActionSelector
+from action_selectors import SimplePolicySelector, BaseActionSelector
 from agents.agent_training import AgentTraining
 from memory import CompositeMemory
 import torch.nn.utils as nn_utils
@@ -66,8 +66,8 @@ class A2C(AgentTraining):
 
     def train(self, save_path):
         steps_generator = MultiEnvCompressedStepsGenerator([self.get_environment() for i in range (self._n_envs)],
-                                                   ProbValuePolicySelector(self._ref_env.action_space.n, model=self._model),
-                                                   n_steps=self._unfolding_steps, gamma=self._gamma)
+                                                           SimplePolicySelector(self._ref_env.action_space.n, model=lambda x: self._model(x)[0]),
+                                                           n_steps=self._unfolding_steps, gamma=self._gamma)
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
 
@@ -133,7 +133,7 @@ class A2C(AgentTraining):
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
-        return ProbValuePolicySelector(action_space_size=cls.get_environment().action_space.n, model=load(load_path))
+        return SimplePolicySelector(action_space_size=cls.get_environment().action_space.n, model=lambda x: load(load_path)(x)[0])
 
     @classmethod
     def get_environment(cls):

@@ -5,7 +5,7 @@ from tensorboardX import SummaryWriter
 from torch import load, cuda, save, nn, tensor, isnan
 from torch.optim import Adam
 import torch.multiprocessing as mp
-from action_selectors import BaseActionSelector, ProbValuePolicySelector
+from action_selectors import BaseActionSelector, SimplePolicySelector
 from agents.a2c.a2c import A2CNetwork
 from agents.agent_training import AgentTraining
 from steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransition
@@ -20,7 +20,9 @@ def env_maker(): return gym.make("CartPole-v1")
 
 def child_process(queue, envs_per_thread, n_actions, model, n_steps, gamma):
     steps_generator = MultiEnvCompressedStepsGenerator([env_maker() for _ in range(envs_per_thread)],
-                                                        ProbValuePolicySelector(n_actions, model=model),
+                                                        SimplePolicySelector(n_actions,
+                                                                             model=lambda x: model(x)[0],
+                                                                             model_device="cpu"),
                                                         n_steps=n_steps, gamma=gamma)
 
     for exp in steps_generator:
@@ -180,8 +182,7 @@ class A3C(AgentTraining):
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
-        return ProbValuePolicySelector(action_space_size=cls.get_environment().action_space.n,
-                                       model=load(load_path))
+        return SimplePolicySelector(action_space_size=cls.get_environment().action_space.n, model=lambda x: load(load_path)(x)[0], model_device="cpu")
 
     @classmethod
     def get_environment(cls):
