@@ -9,10 +9,17 @@ from agents.agent_training import AgentTraining
 from torch import load, nn, cuda, save, LongTensor, FloatTensor
 from memory import CompositeMemory
 from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator
+from util import can_stop
 
 
 class REINFORCE(AgentTraining):
-    def __init__(self, gamma=0.99, beta=0.01, lr=0.01, batch_size=10, max_training_steps=1000, desired_avg_reward=500):
+    def __init__(self,
+                 gamma=0.99,
+                 beta=0.01,
+                 lr=0.01,
+                 batch_size=10,
+                 max_training_steps=1000,
+                 desired_avg_reward=500):
         super().__init__()
 
         self._env = self.get_environment()
@@ -35,14 +42,14 @@ class REINFORCE(AgentTraining):
 
     def train(self, save_path):
         steps_generator = CompressedStepsGenerator(self._env,
-                                                   SimplePolicySelector(self._env.action_space.n, model=self._model))
+                                                   SimplePolicySelector(model=self._model))
 
         batch_count = 0
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
 
         for idx, transition in enumerate(steps_generator):
-            if idx == self._n_training_steps-1 or self._desired_avg_reward <= sum(last_episodes_rewards)/100:
+            if can_stop(idx, self._n_training_steps, last_episodes_rewards, self._desired_avg_reward):
                 save(self._model, save_path)
                 break
 
@@ -94,7 +101,7 @@ class REINFORCE(AgentTraining):
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
-        return SimplePolicySelector(action_space_size=cls.get_environment().action_space.n, model=load(load_path))
+        return SimplePolicySelector(model=load(load_path))
 
     @classmethod
     def get_environment(cls):

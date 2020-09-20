@@ -32,6 +32,12 @@ class BaseActionSelector(ABC):
 class ModelBasedActionSelector(BaseActionSelector, ABC):
     @abstractmethod
     def __init__(self, model, model_device="cuda"):
+        """
+        :param model: The model to be used. It can also be passed inside a function
+        :param model_device: The device on which the model itself resides. That is, for model(x), is x on cpu or gpu.
+        It is the user's responsibility to make sure they align.
+        """
+
         super().__init__()
         self._model = model
         self._model_device = model_device
@@ -42,9 +48,8 @@ class SimplePolicySelector(ModelBasedActionSelector):
     Action selector for models trained to return probabilities (as logits).
     """
 
-    def __init__(self, action_space_size, model, model_device="cuda"):
+    def __init__(self, model, model_device="cuda"):
         super().__init__(model, model_device)
-        self._action_space_size = action_space_size
 
     @no_grad()
     def pick(self, state, is_batch=False):
@@ -55,8 +60,10 @@ class SimplePolicySelector(ModelBasedActionSelector):
             return select_index_from_probs(probs.cpu().numpy())
         else:
             probs = self._model(FloatTensor(np.array(state)).to(self._model_device).unsqueeze(0))\
-                                .softmax(dim=-1)
-            return np.random.choice(range(self._action_space_size), p=np.squeeze(probs.cpu().detach().numpy()))
+                        .softmax(dim=-1)\
+                        .cpu().numpy()
+            probs = np.squeeze(probs)
+            return np.random.choice(range(len(probs)), p=probs)
 
 
 class RandomDiscreteSelector(BaseActionSelector):
@@ -77,14 +84,14 @@ class RandomDiscreteSelector(BaseActionSelector):
         return random.choice(range(self._n_actions))
 
 
-class ValueSelectors(ModelBasedActionSelector):
+class ValueSelector(ModelBasedActionSelector):
     def __init__(self, model, model_device="cuda"):
         super().__init__(model, model_device)
 
     def pick(self, state, is_batch=False):
         if is_batch:
             return self._model(FloatTensor(np.array([np.array(s, copy=False) for s in state], copy=False))
-                        .to(self._model_device))[0]\
-                        .argmax(dim=-1)
+                       .to(self._model_device)) \
+                       .argmax(dim=-1)
         else:
-            return self._model(FloatTensor(np.array(state)).to(self._model_device).unsqueeze(0))[0].argmax(dim=-1)
+            return self._model(FloatTensor(np.array(state)).to(self._model_device).unsqueeze(0)).argmax(dim=-1)

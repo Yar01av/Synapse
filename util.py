@@ -31,3 +31,11 @@ def unpack(transitions, model, gamma, unfolding_steps, device="cuda"):
     t_qvals = t_reward + (gamma**unfolding_steps)*t_next_states_values_predictions
 
     return t_old_states, t_acts, t_qvals.detach()
+
+
+# Returns true if the training can stop due to the maximum number of steps
+# being reached or the average reward reaching the desired level
+def can_stop(current_step_idx, total_steps, latest_rewards, desired_avg_reward, minimum_steps=100):
+    return current_step_idx == total_steps - 1 or \
+           (desired_avg_reward <= sum(latest_rewards) / len(latest_rewards)
+            if len(latest_rewards) >= minimum_steps else False)

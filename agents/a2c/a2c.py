@@ -11,7 +11,7 @@ import torch.nn.utils as nn_utils
 from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator, MultiEnvCompressedStepsGenerator
 import torch.nn.functional as F
 
-from util import unpack
+from util import unpack, can_stop
 
 
 class A2CNetwork(nn.Module):
@@ -41,8 +41,16 @@ class A2CNetwork(nn.Module):
 
 
 class A2C(AgentTraining):
-    def __init__(self, gamma=0.99, beta=0.01, lr=0.001, batch_size=8, max_training_steps=1000, desired_avg_reward=500,
-                 unfolding_steps=4, n_envs=1, clip_grad=0.1):
+    def __init__(self,
+                 gamma=0.99,
+                 beta=0.01,
+                 lr=0.001,
+                 batch_size=8,
+                 max_training_steps=1000,
+                 desired_avg_reward=500,
+                 unfolding_steps=4,
+                 n_envs=1,
+                 clip_grad=0.1):
         super().__init__()
 
         self._n_envs = n_envs
@@ -65,16 +73,14 @@ class A2C(AgentTraining):
         self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
 
     def train(self, save_path):
-        steps_generator = MultiEnvCompressedStepsGenerator([self.get_environment() for i in range (self._n_envs)],
-                                                           SimplePolicySelector(self._ref_env.action_space.n, model=lambda x: self._model(x)[0]),
+        steps_generator = MultiEnvCompressedStepsGenerator([self.get_environment() for i in range(self._n_envs)],
+                                                           SimplePolicySelector(model=lambda x: self._model(x)[0]),
                                                            n_steps=self._unfolding_steps, gamma=self._gamma)
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
 
         for idx, transition in enumerate(steps_generator):
-            if idx == self._n_training_steps-1 or \
-                     (self._desired_avg_reward <= sum(last_episodes_rewards)/len(last_episodes_rewards)
-                     if len(last_episodes_rewards) >= 100 else False):
+            if can_stop(idx, self._n_training_steps, last_episodes_rewards, self._desired_avg_reward):
                 save(self._model, save_path)
                 break
 
@@ -133,7 +139,7 @@ class A2C(AgentTraining):
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
-        return SimplePolicySelector(action_space_size=cls.get_environment().action_space.n, model=lambda x: load(load_path)(x)[0])
+        return SimplePolicySelector(model=lambda x: load(load_path)(x)[0])
 
     @classmethod
     def get_environment(cls):

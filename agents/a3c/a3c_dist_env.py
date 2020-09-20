@@ -12,7 +12,7 @@ from steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransit
 import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 
-from util import unpack
+from util import unpack, can_stop
 
 
 def env_maker(): return gym.make("CartPole-v1")
@@ -20,8 +20,7 @@ def env_maker(): return gym.make("CartPole-v1")
 
 def child_process(queue, envs_per_thread, n_actions, model, n_steps, gamma):
     steps_generator = MultiEnvCompressedStepsGenerator([env_maker() for _ in range(envs_per_thread)],
-                                                        SimplePolicySelector(n_actions,
-                                                                             model=lambda x: model(x)[0],
+                                                        SimplePolicySelector(model=lambda x: model(x)[0],
                                                                              model_device="cpu"),
                                                         n_steps=n_steps, gamma=gamma)
 
@@ -68,8 +67,17 @@ class A3C(AgentTraining):
     """
     # TODO: more gpu
 
-    def __init__(self, gamma=0.99, beta=0.01, lr=0.001, batch_size=8, max_training_steps=1000, desired_avg_reward=500,
-                 unfolding_steps=2, envs_per_thread=1, clip_grad=0.1, n_processes=8):
+    def __init__(self,
+                 gamma=0.99,
+                 beta=0.01,
+                 lr=0.001,
+                 batch_size=8,
+                 max_training_steps=1000,
+                 desired_avg_reward=500,
+                 unfolding_steps=2,
+                 envs_per_thread=1,
+                 clip_grad=0.1,
+                 n_processes=8):
         super().__init__()
 
         mp.set_start_method('spawn')
@@ -116,9 +124,7 @@ class A3C(AgentTraining):
         try:
             while True:
                 # Check if we should stop already
-                if step_idx == self._n_training_steps-1 or \
-                        (self._desired_avg_reward <= sum(last_episodes_rewards)/len(last_episodes_rewards)
-                        if len(last_episodes_rewards) >= 100 else False):
+                if can_stop(step_idx, self._n_training_steps, last_episodes_rewards, self._desired_avg_reward):
                     save(self._model, save_path)
                     break
 
@@ -182,7 +188,7 @@ class A3C(AgentTraining):
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
-        return SimplePolicySelector(action_space_size=cls.get_environment().action_space.n, model=lambda x: load(load_path)(x)[0], model_device="cpu")
+        return SimplePolicySelector(model=lambda x: load(load_path)(x)[0], model_device="cpu")
 
     @classmethod
     def get_environment(cls):
