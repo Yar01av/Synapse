@@ -6,9 +6,10 @@ from random import seed
 import torch
 #from tensorflow import set_random_seed
 
-from agents.a2c.a2c import A2C
-from agents.a3c.a3c_dist_env import A3C
-from agents.reinforce.reinforce import REINFORCE
+from agents.a2c.standard import A2C
+from agents.a3c.distributed_envs import A3C
+from agents.dqn.standard import DQN
+from agents.reinforce.standard import REINFORCE
 
 N_EPISODES = 10
 MAX_EPISODE_LENGTH = 500
@@ -21,13 +22,7 @@ torch.manual_seed(0)
 
 if __name__ == "__main__":
     # Uncomment for a proper agent
-    training = A2C(max_training_steps=10_000_000,
-                   desired_avg_reward=500,
-                   unfolding_steps=4,
-                   n_envs=1,
-                   lr=0.001,
-                   clip_grad=1000,
-                   batch_size=8)
+    training = DQN()
     # training = REINFORCE(max_training_steps=200000, desired_avg_reward=180)
     env = training.get_environment()
 

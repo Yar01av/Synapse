@@ -2,14 +2,13 @@ from collections import deque
 
 import gym
 from tensorboardX import SummaryWriter
-from torch import load, cuda, save, nn, tensor, isnan
+from torch import load, save, nn
 from torch.optim import Adam
 import torch.multiprocessing as mp
-from action_selectors import BaseActionSelector, SimplePolicySelector
-from agents.a2c.a2c import A2CNetwork
-from agents.agent_training import AgentTraining
+from action_selectors.base import BaseActionSelector
+from action_selectors.policy import SimplePolicySelector
+from agents.base import AgentTraining
 from steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransition
-import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 
 from util import unpack, can_stop

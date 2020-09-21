@@ -2,13 +2,13 @@ from collections import deque
 
 import gym
 from tensorboardX import SummaryWriter
-from torch import cuda, nn, load, save, LongTensor, FloatTensor
+from torch import cuda, nn, load, save
 from torch.optim import Adam
-from action_selectors import SimplePolicySelector, BaseActionSelector
-from agents.agent_training import AgentTraining
-from memory import CompositeMemory
+from action_selectors.base import BaseActionSelector
+from action_selectors.policy import SimplePolicySelector
+from agents.base import AgentTraining
 import torch.nn.utils as nn_utils
-from steps_generators import SimpleStepsGenerator, CompressedStepsGenerator, MultiEnvCompressedStepsGenerator
+from steps_generators import MultiEnvCompressedStepsGenerator
 import torch.nn.functional as F
 
 from util import unpack, can_stop

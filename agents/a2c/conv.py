@@ -3,7 +3,7 @@ import numpy as np
 import ptan
 from torch import nn, LongTensor, FloatTensor, flatten
 from torch.optim import Adam
-from agents.a2c.a2c import A2C
+from agents.a2c.standard import A2C
 
 from util import get_output_size
 
