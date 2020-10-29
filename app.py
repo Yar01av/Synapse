@@ -5,20 +5,26 @@ from random import seed
 
 import torch
 #from tensorflow import set_random_seed
-
+import numpy as np
 from agents.a2c.standard import A2C
 from agents.a3c.distributed_envs import A3C
 from agents.dqn.standard import DQN
 from agents.reinforce.standard import REINFORCE
-
-N_EPISODES = 10
-MAX_EPISODE_LENGTH = 500
+import random
 
 
 # Seed to make sure that the results are reproducible
 seed(1)
-#set_random_seed(123)
+random.seed(0)
 torch.manual_seed(0)
+np.random.seed(0)
+
+torch.set_printoptions(7)
+
+
+N_EPISODES = 10
+MAX_EPISODE_LENGTH = 500
+
 
 if __name__ == "__main__":
     # Uncomment for a proper agent

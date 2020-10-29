@@ -5,7 +5,7 @@ from tensorboardX import SummaryWriter
 from torch import cuda, nn, load, save, LongTensor, FloatTensor, IntTensor, squeeze, max
 from torch.optim import Adam
 from action_selectors.base import BaseActionSelector
-from action_selectors.value import EpsilonGreedySelector
+from action_selectors.value import GreedySelector, EpsilonGreedySelector
 from agents.base import AgentTraining
 from steps_generators import CompressedStepsGenerator
 import random
@@ -18,11 +18,10 @@ class DQNNetwork(nn.Module):
         super().__init__()
 
         self._model = nn.Sequential(nn.Linear(input_shape, 150),
-                              nn.ReLU(),
-                              nn.Linear(150, 120),
-                              nn.ReLU(),
-                              nn.Linear(120, n_actions),
-                              )
+                                    nn.ReLU(),
+                                    nn.Linear(150, 120),
+                                    nn.ReLU(),
+                                    nn.Linear(120, n_actions))
 
     def forward(self, x):
         return self._model(x)
@@ -31,11 +30,11 @@ class DQNNetwork(nn.Module):
 class DQN(AgentTraining):
     def __init__(self,
                  gamma=0.99,
-                 lr=0.01,
-                 batch_size=64,
+                 lr=0.001,
+                 batch_size=34,
                  max_training_steps=10_000_000,
                  desired_avg_reward=500,
-                 max_buffer_size=10_000_000,
+                 max_buffer_size=1_000_000,
                  epsilon=1.0,
                  epsilon_min=0.01,
                  unfolding_steps=1,
@@ -63,8 +62,16 @@ class DQN(AgentTraining):
         self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
 
     def train(self, save_path):
-        steps_generator = CompressedStepsGenerator(self.get_environment(), EpsilonGreedySelector(model=self._model),
-                                                   n_steps=self._unfolding_steps, gamma=self._gamma)
+        action_selector = EpsilonGreedySelector(model=self._model,
+                                                n_actions=self._ref_env.action_space.n,
+                                                model_device="cuda",
+                                                init_epsilon=self._epsilon,
+                                                min_epsilon=self._epsilon_min,
+                                                epsilon_decay=self._epsilon_decay)
+        steps_generator = CompressedStepsGenerator(self.get_environment(),
+                                                   action_selector,
+                                                   n_steps=self._unfolding_steps,
+                                                   gamma=self._gamma)
 
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
@@ -77,7 +84,7 @@ class DQN(AgentTraining):
             # Remember the new transition
             self._buffer.append(transition)
 
-            # Lof the results at the end of an episode
+            # Log the results at the end of an episode
             if transition.done:
                 episode_idx += 1
 
@@ -90,14 +97,16 @@ class DQN(AgentTraining):
 
             # Perform a training step
             if len(self._buffer) >= self._batch_size:
+                temp_var = random.random()
+
                 states, targets = self._replay(self._buffer, self._batch_size)
                 self._learn(states, targets, self._optimizer)
 
+                temp_var = random.random()
+                pass
 
             # Reduce exploration
-            self._epsilon = self._epsilon * self._epsilon_decay if self._epsilon > self._epsilon_min else self._epsilon
-
-
+            action_selector.decay_epsilon()
 
         self._plotter.close()
 
@@ -121,10 +130,10 @@ class DQN(AgentTraining):
         next_states = squeeze(next_states)
 
         targets = rewards + \
-                  self._gamma * max(self._model(next_states), dim=1)[0].to("cuda") \
+                  self._gamma * max(self._model(next_states).detach(), dim=1)[0].to("cuda") \
                   * (-dones + 1)
         targets.to("cuda")
-        targets_full = self._model(states)
+        targets_full = self._model(states).detach()
         ind = LongTensor([i for i in range(self._batch_size)]).to("cuda")
 
         targets_full[ind, actions] = targets
@@ -133,8 +142,11 @@ class DQN(AgentTraining):
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
-        return EpsilonGreedySelector(model=load(load_path))
+        return GreedySelector(model=load(load_path))
 
     @classmethod
     def get_environment(cls):
-        return gym.make("CartPole-v1")
+        env = gym.make("CartPole-v1")
+        env.seed(0)
+
+        return env
