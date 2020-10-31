@@ -90,14 +90,7 @@ class DQN(AgentTraining):
             # Log the results at the end of an episode
             if transition.done:
                 episode_idx += 1
-
-                # Log the new rewards
-                new_rewards = steps_generator.pop_per_episode_rewards()
-                assert len(new_rewards) == 1
-                last_episodes_rewards.extend(new_rewards)
-                self._plotter.add_scalar("Total reward per episode", new_rewards[0], episode_idx)
-                print(f"At step {idx}, \t the average over the last 100 games is "
-                      f"{sum(last_episodes_rewards)/min(len(last_episodes_rewards), 100)}")
+                self._log_new_rewards(episode_idx, idx, last_episodes_rewards, steps_generator)
 
             # Perform a training step
             if len(self._buffer) >= self._batch_size:
@@ -108,6 +101,14 @@ class DQN(AgentTraining):
             action_selector.decay_epsilon()
 
         self._plotter.close()
+
+    def _log_new_rewards(self, episode_idx, idx, last_episodes_rewards, steps_generator):
+        new_rewards = steps_generator.pop_per_episode_rewards()
+        assert len(new_rewards) == 1
+        last_episodes_rewards.extend(new_rewards)
+        self._plotter.add_scalar("Total reward per episode", new_rewards[0], episode_idx)
+        print(f"At step {idx}, \t the average over the last 100 games is "
+              f"{sum(last_episodes_rewards) / min(len(last_episodes_rewards), 100)}")
 
     def _learn(self, states, targets, optimizer):
         predictions = self._model(states.to("cuda"))
@@ -131,9 +132,7 @@ class DQN(AgentTraining):
         next_states = squeeze(next_states)
 
         # Use Bellman equation to compute the targets
-        targets = rewards + \
-                  self._gamma * max(self._model(next_states).detach(), dim=1)[0].to("cuda") \
-                  * (-dones + 1)
+        targets = rewards + self._gamma * max(self._model(next_states).detach(), dim=1)[0].to("cuda") * (-dones + 1)
         targets.to("cuda")
         targets_full = self._model(states).detach()
         ind = LongTensor([i for i in range(self._batch_size)]).to("cuda")
