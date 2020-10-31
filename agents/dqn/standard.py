@@ -13,6 +13,7 @@ import random
 from util import can_stop
 
 
+# The neural network module
 class DQNNetwork(nn.Module):
     def __init__(self, input_shape, n_actions):
         super().__init__()
@@ -76,7 +77,9 @@ class DQN(AgentTraining):
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
 
+        # Iterate over the transitions and learn if the right transition arrives
         for idx, transition in enumerate(steps_generator):
+            # Stop if the right number of reward has been reached or the maximum number of the iterations exceeded.
             if can_stop(idx, self._n_training_steps, last_episodes_rewards, self._desired_avg_reward):
                 save(self._model, save_path)
                 break
@@ -88,6 +91,7 @@ class DQN(AgentTraining):
             if transition.done:
                 episode_idx += 1
 
+                # Log the new rewards
                 new_rewards = steps_generator.pop_per_episode_rewards()
                 assert len(new_rewards) == 1
                 last_episodes_rewards.extend(new_rewards)
@@ -97,13 +101,8 @@ class DQN(AgentTraining):
 
             # Perform a training step
             if len(self._buffer) >= self._batch_size:
-                temp_var = random.random()
-
                 states, targets = self._replay(self._buffer, self._batch_size)
                 self._learn(states, targets, self._optimizer)
-
-                temp_var = random.random()
-                pass
 
             # Reduce exploration
             action_selector.decay_epsilon()
@@ -119,6 +118,7 @@ class DQN(AgentTraining):
         optimizer.zero_grad()
 
     def _replay(self, memory, batch_size):
+        # Sample the minibatch and extract the useful tensors out of it
         minibatch = random.sample(memory, batch_size)
         states = FloatTensor([t.previous_state for t in minibatch]).to("cuda")
         actions = LongTensor([t.action for t in minibatch]).to("cuda")
@@ -126,9 +126,11 @@ class DQN(AgentTraining):
         next_states = FloatTensor([t.next_state for t in minibatch]).to("cuda")
         dones = IntTensor([t.done for t in minibatch]).to("cuda")
 
+        # The states may need to be squeezed
         states = squeeze(states)
         next_states = squeeze(next_states)
 
+        # Use Bellman equation to compute the targets
         targets = rewards + \
                   self._gamma * max(self._model(next_states).detach(), dim=1)[0].to("cuda") \
                   * (-dones + 1)
@@ -136,12 +138,14 @@ class DQN(AgentTraining):
         targets_full = self._model(states).detach()
         ind = LongTensor([i for i in range(self._batch_size)]).to("cuda")
 
+        # Add the targets to the original model prediction
         targets_full[ind, actions] = targets
 
         return states, targets_full
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
+        # It's important to return this selector as the algorithm is off-policy.
         return GreedySelector(model=load(load_path))
 
     @classmethod

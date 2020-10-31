@@ -37,11 +37,8 @@ class A2CConvNetwork(nn.Module):
     def forward(self, x):
         base_output = self._base(x.float()/256)
         base_output = flatten(base_output, start_dim=1)
-        #base_output = base_output.view(base_output.size()[0], -1)
 
-        y=self._policy_head(base_output)
-        z=self._value_head(base_output)
-        return y, z
+        return self._policy_head(base_output), self._value_head(base_output)
 
 
 class A2CConv(A2C):
