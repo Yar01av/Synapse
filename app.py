@@ -4,7 +4,6 @@ from random import seed
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 import torch
-#from tensorflow import set_random_seed
 import numpy as np
 from agents.a2c.standard import A2C
 from agents.a3c.distributed_envs import A3C
@@ -28,11 +27,11 @@ MAX_EPISODE_LENGTH = 500
 
 if __name__ == "__main__":
     # Uncomment for a proper agent
-    training = A3C()
+    training = A3C(max_training_steps=100000)
     env = training.get_environment()
 
-    training.train("checkpoint2.h5")
-    selector = training.load_selector(load_path="checkpoint2.h5")
+    training.train("checkpoint.h5")
+    selector = training.load_selector(load_path="checkpoint.h5")
 
     # Uncomment for a random baseline
     # env = gym.make("CartPole-v1")

@@ -1,27 +1,27 @@
 from collections import deque
 
 import gym
+import torch.multiprocessing as mp
+import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from torch import load, save, nn
 from torch.optim import Adam
-import torch.multiprocessing as mp
+
 from action_selectors.base import BaseActionSelector
 from action_selectors.policy import SimplePolicySelector
 from agents.base import AgentTraining
 from steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransition
-import torch.nn.functional as F
-
 from util import unpack, can_stop
 
 
 def env_maker(): return gym.make("CartPole-v1")
 
 
-def child_process(queue, envs_per_thread, n_actions, model, n_steps, gamma):
+def child_process(queue, envs_per_thread, model, n_steps, gamma):
     steps_generator = MultiEnvCompressedStepsGenerator([env_maker() for _ in range(envs_per_thread)],
-                                                        SimplePolicySelector(model=lambda x: model(x)[0],
-                                                                             model_device="cpu"),
-                                                        n_steps=n_steps, gamma=gamma)
+                                                       SimplePolicySelector(model=lambda x: model(x)[0],
+                                                                            model_device="cpu"),
+                                                       n_steps=n_steps, gamma=gamma)
 
     # Play the game and push the experiences into the queue
     for exp in steps_generator:
@@ -56,7 +56,7 @@ class A3CNetwork(nn.Module):
         )
 
     def forward(self, x):
-        #base_output = self._base(x)
+        # base_output = self._base(x)
         return self._policy_head(x), self._value_head(x)
 
 
@@ -64,6 +64,7 @@ class A3C(AgentTraining):
     """
     A version of A3C where different threads play with different environments but the learning is done centrally.
     """
+
     # TODO: more gpu
 
     def __init__(self,
@@ -147,12 +148,11 @@ class A3C(AgentTraining):
         last_episodes_rewards.append(exp)
         self._plotter.add_scalar("Total reward per episode", exp, episode_idx)
         print(f"At step {step_idx}, \t the average over the last 100 games is "
-              f"{sum(last_episodes_rewards)/min(len(last_episodes_rewards), 100)}")
+              f"{sum(last_episodes_rewards) / min(len(last_episodes_rewards), 100)}")
 
     def _spawn_experience_generating_process(self, train_queue):
         process = mp.Process(target=child_process, args=(train_queue,
                                                          self._envs_per_thread,
-                                                         self.get_environment().action_space.n,
                                                          self._model,
                                                          self._unfolding_steps,
                                                          self._gamma))
@@ -204,7 +204,8 @@ class A3C(AgentTraining):
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
-        return SimplePolicySelector(model=lambda x: load(load_path)(x)[0], model_device="cpu")
+        loaded_model = load(load_path)
+        return SimplePolicySelector(model=lambda x: loaded_model(x)[0], model_device="cpu")
 
     @classmethod
     def get_environment(cls):

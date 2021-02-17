@@ -48,7 +48,7 @@ class A2C(AgentTraining):
                  batch_size=8,
                  max_training_steps=1000,
                  desired_avg_reward=500,
-                 unfolding_steps=4,
+                 unfolding_steps=2,
                  n_envs=1,
                  clip_grad=0.1):
         super().__init__()
@@ -142,7 +142,9 @@ class A2C(AgentTraining):
 
     @classmethod
     def load_selector(cls, load_path) -> BaseActionSelector:
-        return SimplePolicySelector(model=lambda x: load(load_path)(x)[0])
+        loaded_model = load(load_path)
+
+        return SimplePolicySelector(model=lambda x: loaded_model(x)[0])
 
     @classmethod
     def get_environment(cls):
