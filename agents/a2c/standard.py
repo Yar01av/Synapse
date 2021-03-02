@@ -50,7 +50,7 @@ class A2C(AgentTraining):
                  desired_avg_reward=500,
                  unfolding_steps=2,
                  n_envs=1,
-                 clip_grad=0.1):
+                 clip_grad=1e12):
         super().__init__()
 
         self._n_envs = n_envs
