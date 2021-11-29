@@ -39,9 +39,11 @@ class DQN(AgentTraining):
                  epsilon=1.0,
                  epsilon_min=0.01,
                  unfolding_steps=1,
-                 epsilon_decay=0.996):
+                 epsilon_decay=0.996,
+                 device="cuda"):
         super().__init__()
 
+        self._device = device
         self._unfolding_steps = unfolding_steps
         self._epsilon_decay = epsilon_decay
         self._epsilon_min = epsilon_min
@@ -65,7 +67,7 @@ class DQN(AgentTraining):
     def train(self, save_path):
         action_selector = EpsilonGreedySelector(model=self._model,
                                                 n_actions=self._ref_env.action_space.n,
-                                                model_device="cuda",
+                                                model_device=self._device,
                                                 init_epsilon=self._epsilon,
                                                 min_epsilon=self._epsilon_min,
                                                 epsilon_decay=self._epsilon_decay)
@@ -111,8 +113,8 @@ class DQN(AgentTraining):
               f"{sum(last_episodes_rewards) / min(len(last_episodes_rewards), 100)}")
 
     def _learn(self, states, targets, optimizer):
-        predictions = self._model(states.to("cuda"))
-        loss = nn.MSELoss()(predictions, targets.to("cuda"))
+        predictions = self._model(states.to(self._device))
+        loss = nn.MSELoss()(predictions, targets.to(self._device))
         loss.backward()
 
         optimizer.step()
@@ -121,21 +123,21 @@ class DQN(AgentTraining):
     def _replay(self, memory, batch_size):
         # Sample the minibatch and extract the useful tensors out of it
         minibatch = random.sample(memory, batch_size)
-        states = FloatTensor([t.previous_state for t in minibatch]).to("cuda")
-        actions = LongTensor([t.action for t in minibatch]).to("cuda")
-        rewards = FloatTensor([t.reward for t in minibatch]).to("cuda")
-        next_states = FloatTensor([t.next_state for t in minibatch]).to("cuda")
-        dones = IntTensor([t.done for t in minibatch]).to("cuda")
+        states = FloatTensor([t.previous_state for t in minibatch]).to(self._device)
+        actions = LongTensor([t.action for t in minibatch]).to(self._device)
+        rewards = FloatTensor([t.reward for t in minibatch]).to(self._device)
+        next_states = FloatTensor([t.next_state for t in minibatch]).to(self._device)
+        dones = IntTensor([t.done for t in minibatch]).to(self._device)
 
         # The states may need to be squeezed
         states = squeeze(states)
         next_states = squeeze(next_states)
 
         # Use Bellman equation to compute the targets
-        targets = rewards + self._gamma * max(self._model(next_states).detach(), dim=1)[0].to("cuda") * (-dones + 1)
-        targets.to("cuda")
+        targets = rewards + self._gamma * max(self._model(next_states).detach(), dim=1)[0].to(self._device) * (-dones + 1)
+        targets.to(self._device)
         targets_full = self._model(states).detach()
-        ind = LongTensor([i for i in range(self._batch_size)]).to("cuda")
+        ind = LongTensor([i for i in range(self._batch_size)]).to(self._device)
 
         # Add the targets to the original model prediction
         targets_full[ind, actions] = targets
