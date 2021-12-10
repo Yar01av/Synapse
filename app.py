@@ -13,7 +13,7 @@ import random
 
 
 # Seed to make sure that the results are reproducible
-seed(1)
+seed(0)
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
@@ -21,7 +21,7 @@ np.random.seed(0)
 torch.set_printoptions(7)
 
 
-N_EPISODES = 10
+N_EPISODES = 30
 MAX_EPISODE_LENGTH = 500
 
 
