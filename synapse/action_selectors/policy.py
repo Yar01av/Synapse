@@ -3,8 +3,7 @@ from abc import abstractmethod
 import numpy as np
 from torch import no_grad, FloatTensor
 
-from action_selectors.base import VectorActionSelector, ActionSelector
-from util import select_index_from_probs
+from .base import VectorActionSelector, ActionSelector
 
 
 class PolicyActionSelector(ActionSelector):

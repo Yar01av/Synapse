@@ -1,11 +1,10 @@
 import gym
-import numpy as np
 import ptan
-from torch import nn, LongTensor, FloatTensor, flatten
+from torch import nn, flatten
 from torch.optim import Adam
-from agents.a2c.standard import A2C
+from .standard import A2C
 
-from util import get_output_size
+from synapse.util import get_output_size
 
 
 class A2CConvNetwork(nn.Module):

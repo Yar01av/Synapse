@@ -4,7 +4,7 @@ import numpy as np
 from torch import FloatTensor
 import random
 
-from action_selectors.base import ActionSelector
+from .base import ActionSelector
 
 
 class BaseValueActionSelector(ActionSelector):

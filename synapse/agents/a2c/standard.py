@@ -4,14 +4,14 @@ import gym
 from tensorboardX import SummaryWriter
 from torch import cuda, nn, load, save
 from torch.optim import Adam
-from action_selectors.base import ActionSelector
-from action_selectors.policy import LogitActionSelector, VecLogitActionSelector
-from agents.base import AgentTraining
+from synapse.action_selectors.base import ActionSelector
+from synapse.action_selectors.policy import LogitActionSelector, VecLogitActionSelector
+from ..base import AgentTraining
 import torch.nn.utils as nn_utils
-from steps_generators import MultiEnvCompressedStepsGenerator
+from synapse.steps_generators import MultiEnvCompressedStepsGenerator
 import torch.nn.functional as F
 
-from util import unpack, can_stop
+from synapse.util import unpack, can_stop
 
 
 class A2CNetwork(nn.Module):

@@ -7,11 +7,11 @@ from tensorboardX import SummaryWriter
 from torch import load, save, nn
 from torch.optim import Adam
 
-from action_selectors.base import ActionSelector
-from action_selectors.policy import VecLogitActionSelector, LogitActionSelector
-from agents.base import AgentTraining
-from steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransition
-from util import unpack, can_stop
+from synapse.action_selectors.base import ActionSelector
+from synapse.action_selectors.policy import VecLogitActionSelector, LogitActionSelector
+from synapse.agents.base import AgentTraining
+from synapse.steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransition
+from synapse.util import unpack, can_stop
 
 
 def env_maker(): return gym.make("CartPole-v1")

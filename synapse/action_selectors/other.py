@@ -1,6 +1,6 @@
 import random
 
-from action_selectors.base import ActionSelector
+from .base import ActionSelector
 
 
 class RandomDiscreteSelector(ActionSelector):

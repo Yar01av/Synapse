@@ -4,13 +4,13 @@ import gym
 from torch.optim import Adam
 from tensorboardX import SummaryWriter
 
-from action_selectors.base import ActionSelector
-from action_selectors.policy import LogitActionSelector
-from agents.base import AgentTraining
+from synapse.action_selectors.base import ActionSelector
+from synapse.action_selectors.policy import LogitActionSelector
+from ..base import AgentTraining
 from torch import load, nn, cuda, save, LongTensor, FloatTensor
-from memory import CompositeMemory
-from steps_generators import CompressedStepsGenerator
-from util import can_stop
+from synapse.memory import CompositeMemory
+from synapse.steps_generators import CompressedStepsGenerator
+from synapse.util import can_stop
 
 
 class REINFORCE(AgentTraining):

@@ -4,13 +4,13 @@ import gym
 from tensorboardX import SummaryWriter
 from torch import cuda, nn, load, save, LongTensor, FloatTensor, IntTensor, squeeze, max
 from torch.optim import Adam
-from action_selectors.base import ActionSelector
-from action_selectors.value import GreedySelector, EpsilonGreedySelector
-from agents.base import AgentTraining
-from steps_generators import CompressedStepsGenerator
+from synapse.action_selectors.base import ActionSelector
+from synapse.action_selectors.value import GreedySelector, EpsilonGreedySelector
+from ..base import AgentTraining
+from synapse.steps_generators import CompressedStepsGenerator
 import random
 
-from util import can_stop
+from synapse.util import can_stop
 
 
 # The neural network module

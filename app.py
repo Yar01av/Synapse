@@ -5,10 +5,7 @@ from random import seed
 
 import torch
 import numpy as np
-from agents.a2c.standard import A2C
-from agents.a3c.distributed_envs import A3C
-from agents.dqn.standard import DQN
-from agents.reinforce.standard import REINFORCE
+from synapse.agents.dqn.standard import DQN
 import random
 
 
