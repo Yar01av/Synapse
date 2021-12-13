@@ -1,21 +1,25 @@
+from abc import abstractmethod
+
 import numpy as np
 from torch import FloatTensor
 import random
-from action_selectors.base import ModelBasedActionSelector
+
+from action_selectors.base import ActionSelector
 
 
-class GreedySelector(ModelBasedActionSelector):
+class BaseValueActionSelector(ActionSelector):
+    @abstractmethod
+    def pick(self, state):
+        pass
+
+
+class GreedySelector(BaseValueActionSelector):
     def __init__(self, model, model_device="cuda"):
-        super().__init__(model, model_device)
+        self._model_device = model_device
+        self._model = model
 
-    def pick(self, state, is_batch=False):
-        if is_batch:
-            return self._model(FloatTensor(np.array([np.array(s, copy=False) for s in state], copy=False))
-                       .to(self._model_device)) \
-                       .argmax(dim=-1) \
-                       .numpy()
-        else:
-            return self._model(FloatTensor(np.array(state)).to(self._model_device).unsqueeze(0)).argmax(dim=-1).item()
+    def pick(self, state):
+        return self._model(FloatTensor(np.array(state)).to(self._model_device).unsqueeze(0)).argmax(dim=-1).item()
 
 
 class EpsilonGreedySelector(GreedySelector):
@@ -27,12 +31,11 @@ class EpsilonGreedySelector(GreedySelector):
         self._epsilon_decay = epsilon_decay
         self._epsilon = init_epsilon
 
-    def pick(self, state, is_batch=False):
+    def pick(self, state):
         if np.random.rand() <= self._epsilon:
-            return random.randrange(self._n_actions) if not is_batch \
-                else np.random.randint(0, self._n_actions, size=len(state))
+            return random.randrange(self._n_actions)
         else:
-            return super().pick(state, is_batch)
+            return super().pick(state)
 
     def decay_epsilon(self):
         if self._epsilon > self._min_epsilon:

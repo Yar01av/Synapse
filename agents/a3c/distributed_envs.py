@@ -7,8 +7,8 @@ from tensorboardX import SummaryWriter
 from torch import load, save, nn
 from torch.optim import Adam
 
-from action_selectors.base import BaseActionSelector
-from action_selectors.policy import SimplePolicySelector
+from action_selectors.base import ActionSelector
+from action_selectors.policy import VecLogitActionSelector, LogitActionSelector
 from agents.base import AgentTraining
 from steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransition
 from util import unpack, can_stop
@@ -19,8 +19,8 @@ def env_maker(): return gym.make("CartPole-v1")
 
 def child_process(queue, envs_per_thread, model, n_steps, gamma):
     steps_generator = MultiEnvCompressedStepsGenerator([env_maker() for _ in range(envs_per_thread)],
-                                                       SimplePolicySelector(model=lambda x: model(x)[0],
-                                                                            model_device="cpu"),
+                                                       VecLogitActionSelector(model=lambda x: model(x)[0],
+                                                                              model_device="cpu"),
                                                        n_steps=n_steps, gamma=gamma)
 
     # Play the game and push the experiences into the queue
@@ -157,6 +157,7 @@ class A3C(AgentTraining):
                                                          self._unfolding_steps,
                                                          self._gamma))
         process.start()
+
         return process
 
     def _learn(self, step_idx):
@@ -203,9 +204,9 @@ class A3C(AgentTraining):
         self._plotter.add_scalar("KL Divergence", kl_divergence.item(), step_idx)
 
     @classmethod
-    def load_selector(cls, load_path) -> BaseActionSelector:
+    def load_selector(cls, load_path) -> ActionSelector:
         loaded_model = load(load_path)
-        return SimplePolicySelector(model=lambda x: loaded_model(x)[0], model_device="cpu")
+        return LogitActionSelector(model=lambda x: loaded_model(x)[0], model_device="cpu")
 
     @classmethod
     def get_environment(cls):

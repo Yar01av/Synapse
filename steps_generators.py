@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from action_selectors.base import BaseActionSelector
+from action_selectors.base import ActionSelector, VectorActionSelector
 
 Transition = namedtuple("Transition", ["state", "action", "reward"])
 CompleteTransition = namedtuple("CompleteTransition", ["previous_state", "next_state", "action", "reward", "done"])
@@ -14,10 +14,6 @@ class BaseStepsGenerator(ABC):
     """
 
     @abstractmethod
-    def __init__(self, action_selector: BaseActionSelector):
-        self._action_selector = action_selector
-
-    @abstractmethod
     def __iter__(self):
         pass
 
@@ -28,8 +24,8 @@ class BaseStepsGenerator(ABC):
 
 class SingletonEnvStepsGenerator(BaseStepsGenerator, ABC):
     @abstractmethod
-    def __init__(self, env, action_selector: BaseActionSelector):
-        super().__init__(action_selector)
+    def __init__(self, env, action_selector: ActionSelector):
+        self._action_selector = action_selector
         self._env = env
 
 
@@ -38,7 +34,7 @@ class SimpleStepsGenerator(SingletonEnvStepsGenerator):
     A regular steps generator that outputs experiences of playing the environment.
     """
 
-    def __init__(self, env, action_selector: BaseActionSelector):
+    def __init__(self, env, action_selector: ActionSelector):
         super().__init__(env, action_selector)
         self._per_episode_rewards = list()
 
@@ -81,7 +77,7 @@ class CompressedStepsGenerator(SingletonEnvStepsGenerator):
     Bellman-Ford equation (discounting the subsequent rewards).
     """
 
-    def __init__(self, env, action_selector: BaseActionSelector, n_steps=1, gamma=1):
+    def __init__(self, env, action_selector: ActionSelector, n_steps=1, gamma=1):
         assert n_steps >= 1
         super().__init__(env, action_selector)
         self._gamma = gamma
@@ -142,10 +138,10 @@ class MultiEnvCompressedStepsGenerator(BaseStepsGenerator):
     by maintaining several environments and sampling them in a round robin fashion.
     """
 
-    def __init__(self, envs, action_selector: BaseActionSelector, n_steps=1, gamma=1):
+    def __init__(self, envs, action_selector: VectorActionSelector, n_steps=1, gamma=1):
         assert n_steps >= 1
 
-        super().__init__(action_selector)
+        self._action_selector = action_selector
         self._envs = envs
         self._n_envs = len(envs)
         self._gamma = gamma
@@ -165,7 +161,7 @@ class MultiEnvCompressedStepsGenerator(BaseStepsGenerator):
             env_idx = step_idx%self._n_envs
 
             if env_idx == 0:
-                actions = self._action_selector.pick(former_states, is_batch=True)
+                actions = self._action_selector.pick(former_states)
 
             next_state, reward, done, _ = self._envs[env_idx].step(actions[env_idx])
             steps[env_idx].append(Transition(state=former_states[env_idx], action=actions[env_idx], reward=reward))

@@ -5,7 +5,6 @@ TODO:
 > Training loops should not be creating their own environments
 > Training loops should output the model. The selector will be chosen outside.
 > The demo loop should be simplified.
-> How to install the whole thing. State the versions needed.
 > Rewrite util.py
 
 > Make training restartable

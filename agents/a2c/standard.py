@@ -4,8 +4,8 @@ import gym
 from tensorboardX import SummaryWriter
 from torch import cuda, nn, load, save
 from torch.optim import Adam
-from action_selectors.base import BaseActionSelector
-from action_selectors.policy import SimplePolicySelector
+from action_selectors.base import ActionSelector
+from action_selectors.policy import LogitActionSelector, VecLogitActionSelector
 from agents.base import AgentTraining
 import torch.nn.utils as nn_utils
 from steps_generators import MultiEnvCompressedStepsGenerator
@@ -74,7 +74,7 @@ class A2C(AgentTraining):
 
     def train(self, save_path):
         steps_generator = MultiEnvCompressedStepsGenerator([self.get_environment() for i in range(self._n_envs)],
-                                                           SimplePolicySelector(model=lambda x: self._model(x)[0]),
+                                                           VecLogitActionSelector(model=lambda x: self._model(x)[0]),
                                                            n_steps=self._unfolding_steps, gamma=self._gamma)
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
@@ -141,10 +141,10 @@ class A2C(AgentTraining):
         self._plotter.add_scalar("KL Divergence", kl_divergence.item(), idx)
 
     @classmethod
-    def load_selector(cls, load_path) -> BaseActionSelector:
+    def load_selector(cls, load_path) -> ActionSelector:
         loaded_model = load(load_path)
 
-        return SimplePolicySelector(model=lambda x: loaded_model(x)[0])
+        return LogitActionSelector(model=lambda x: loaded_model(x)[0])
 
     @classmethod
     def get_environment(cls):

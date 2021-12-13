@@ -1,16 +1,15 @@
 import random
 
-from action_selectors.base import BaseActionSelector
+from action_selectors.base import ActionSelector
 
 
-class RandomDiscreteSelector(BaseActionSelector):
+class RandomDiscreteSelector(ActionSelector):
     """
     Action selector that picks actions at random. It assumes that every action is executable
     (even if it doesn't do anything).
     """
 
     def __init__(self, n_actions):
-        super().__init__()
         self._n_actions = n_actions
 
     def pick(self, state, is_batch=False):

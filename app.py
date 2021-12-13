@@ -27,7 +27,7 @@ MAX_EPISODE_LENGTH = 500
 
 if __name__ == "__main__":
     # Uncomment for a proper agent
-    training = A3C(max_training_steps=100000)
+    training = DQN(max_training_steps=100000)
     env = training.get_environment()
 
     training.train("checkpoint.h5")

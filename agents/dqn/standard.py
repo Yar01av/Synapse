@@ -4,7 +4,7 @@ import gym
 from tensorboardX import SummaryWriter
 from torch import cuda, nn, load, save, LongTensor, FloatTensor, IntTensor, squeeze, max
 from torch.optim import Adam
-from action_selectors.base import BaseActionSelector
+from action_selectors.base import ActionSelector
 from action_selectors.value import GreedySelector, EpsilonGreedySelector
 from agents.base import AgentTraining
 from steps_generators import CompressedStepsGenerator
@@ -145,7 +145,7 @@ class DQN(AgentTraining):
         return states, targets_full
 
     @classmethod
-    def load_selector(cls, load_path) -> BaseActionSelector:
+    def load_selector(cls, load_path) -> ActionSelector:
         # It's important to return this selector as the algorithm is off-policy.
         return GreedySelector(model=load(load_path))
 

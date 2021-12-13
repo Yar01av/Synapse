@@ -4,8 +4,8 @@ import gym
 from torch.optim import Adam
 from tensorboardX import SummaryWriter
 
-from action_selectors.base import BaseActionSelector
-from action_selectors.policy import SimplePolicySelector
+from action_selectors.base import ActionSelector
+from action_selectors.policy import LogitActionSelector
 from agents.base import AgentTraining
 from torch import load, nn, cuda, save, LongTensor, FloatTensor
 from memory import CompositeMemory
@@ -43,7 +43,7 @@ class REINFORCE(AgentTraining):
 
     def train(self, save_path):
         steps_generator = CompressedStepsGenerator(self._env,
-                                                   SimplePolicySelector(model=self._model))
+                                                   LogitActionSelector(model=self._model))
 
         batch_count = 0
         last_episodes_rewards = deque(maxlen=100)
@@ -113,8 +113,8 @@ class REINFORCE(AgentTraining):
         self._memory.rewards.append(transition.reward)
 
     @classmethod
-    def load_selector(cls, load_path) -> BaseActionSelector:
-        return SimplePolicySelector(model=load(load_path))
+    def load_selector(cls, load_path) -> ActionSelector:
+        return LogitActionSelector(model=load(load_path))
 
     @classmethod
     def get_environment(cls):
