@@ -1,7 +1,5 @@
 TODO:
-> EpsilonGreedy selector should conform to the ABC
 > StepsGenerators don't follow single responsibility
-> Action selectors violate the abstract interface by allowing the batching
 > Training loops should not be creating their own environments
 > Training loops should output the model. The selector will be chosen outside.
 > The demo loop should be simplified.
