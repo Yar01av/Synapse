@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
-from random import seed
 
 # import os
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+from random import seed
+
 import gym
 import torch
 import numpy as np
@@ -33,14 +34,12 @@ MAX_EPISODE_LENGTH = 500
 
 
 if __name__ == "__main__":
-    PATH_TO_CHECKPOINTS = Path("./checkpoints/")
-
     env = gym.make("CartPole-v1")
     env.seed(0)
     model = REINFORCENetwork(env.observation_space.shape[0], env.action_space.n).cuda()
 
     training = REINFORCE(env, model=model, max_training_steps=10000, device="cuda")
-    training.train(Path(os.environ["PROJECT_ROOT"])/PATH_TO_CHECKPOINTS)
+    training.train(Path("../checkpoints/checkpoint.h5"))
 
     selector = PolicyActionSelector(training.model, model_device="cuda")
 

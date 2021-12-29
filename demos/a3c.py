@@ -35,8 +35,6 @@ MAX_EPISODE_LENGTH = 500
 
 
 if __name__ == "__main__":
-    PATH_TO_CHECKPOINTS = "checkpoints"
-
     env = gym.make("CartPole-v1")
     env.seed(0)
     model = A3CNetwork(env.observation_space.shape[0], env.action_space.n)

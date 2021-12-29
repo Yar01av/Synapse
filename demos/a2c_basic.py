@@ -34,14 +34,12 @@ MAX_EPISODE_LENGTH = 500
 
 
 if __name__ == "__main__":
-    PATH_TO_CHECKPOINTS = "checkpoints"
-
     env = gym.make("CartPole-v1")
     env.seed(0)
     model = A2CNetwork(env.observation_space.shape[0], env.action_space.n).cuda()
 
     training = A2C(env, model=model, max_training_steps=10000, device="cuda")
-    training.train(Path(os.environ["PROJECT_ROOT"])/PATH_TO_CHECKPOINTS/"checkpoint.h5")
+    training.train(Path("../checkpoints/checkpoint.h5"))
 
     selector = PolicyActionSelector(lambda obs: training.model(obs)[0], model_device="cuda")
 
