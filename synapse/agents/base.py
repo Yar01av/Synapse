@@ -4,7 +4,7 @@ import gym
 from synapse.action_selectors.base import ActionSelector
 
 
-class AgentTraining(ABC):
+class DiscreteAgentTraining(ABC):
     """
     Base class for classes implementing various training algorithms.
     """
@@ -17,11 +17,7 @@ class AgentTraining(ABC):
     def train(self, save_path):
         pass
 
-    @classmethod
+    @property
     @abstractmethod
-    def load_selector(cls, load_path) -> ActionSelector:
+    def model(self):
         pass
-
-    @classmethod
-    def get_environment(cls):
-        return gym.make("CartPole-v1")

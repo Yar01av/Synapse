@@ -1,4 +1,5 @@
 import math
+from typing import Callable
 
 import numpy as np
 import torch
@@ -39,3 +40,21 @@ def can_stop(current_step_idx, total_steps, latest_rewards, desired_avg_reward, 
     return current_step_idx == total_steps - 1 or \
            (desired_avg_reward <= sum(latest_rewards) / len(latest_rewards)
             if len(latest_rewards) >= minimum_steps else False)
+
+
+def vector_to_model_input(array, device="cuda", unsqueeze=True):
+    tensor = FloatTensor(np.array(array)).to(device)
+
+    return tensor if unsqueeze is False else tensor.unsqueeze(0)
+
+
+def pipe(args: [Callable]):
+    def output(x):
+        y = args.pop()(x)
+
+        for arg in args:
+            y = args.pop()(y)
+
+        return y
+
+    return output

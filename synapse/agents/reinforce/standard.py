@@ -1,55 +1,54 @@
 from collections import deque
+from copy import deepcopy
 
 import gym
 from torch.optim import Adam
 from tensorboardX import SummaryWriter
 
-from synapse.action_selectors.base import ActionSelector
-from synapse.action_selectors.policy import LogitActionSelector
-from ..base import AgentTraining
+from synapse.action_selectors.policy import PolicyActionSelector
+from ..base import DiscreteAgentTraining
 from torch import load, nn, cuda, save, LongTensor, FloatTensor
 from synapse.memory import CompositeMemory
 from synapse.steps_generators import CompressedStepsGenerator
 from synapse.util import can_stop
 
 
-class REINFORCE(AgentTraining):
+class REINFORCE(DiscreteAgentTraining):
     def __init__(self,
+                 env: gym.Env,
+                 model,
                  gamma=0.99,
                  beta=0.01,
                  lr=0.01,
                  batch_size=10,
                  max_training_steps=1000,
-                 desired_avg_reward=500):
+                 desired_avg_reward=500,
+                 device="cuda"):
         super().__init__()
 
-        self._env = self.get_environment()
+        self._device = device
+        self._model = model
+        self._env = env
         self._desired_avg_reward = desired_avg_reward
         self._beta = beta
         self._n_training_steps = max_training_steps
         self._batch_size = batch_size
         self._lr = lr
         self._gamma = gamma
-        cuda.set_device(0)
-        self._model = nn.Sequential(nn.Linear(self._env.observation_space.shape[0], 128),
-                                    nn.ReLU(),
-                                    nn.Linear(128, self._env.action_space.n)).cuda()
         self._optimizer = Adam(params=self._model.parameters(), lr=lr)
         self._memory = CompositeMemory()
+        self._steps_generator = CompressedStepsGenerator(self._env, PolicyActionSelector(model=self._model))
 
         # Logging related
         SummaryWriter(comment=f"x{self.__class__.__name__}").close()
         self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
 
     def train(self, save_path):
-        steps_generator = CompressedStepsGenerator(self._env,
-                                                   LogitActionSelector(model=self._model))
-
         batch_count = 0
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
 
-        for idx, transition in enumerate(steps_generator):
+        for idx, transition in enumerate(self._steps_generator):
             if can_stop(idx, self._n_training_steps, last_episodes_rewards, self._desired_avg_reward):
                 save(self._model, save_path)
                 break
@@ -60,7 +59,7 @@ class REINFORCE(AgentTraining):
                 batch_count += 1
                 episode_idx += 1
 
-                self._handle_finished_episode(episode_idx, idx, last_episodes_rewards, steps_generator)
+                self._handle_finished_episode(episode_idx, idx, last_episodes_rewards, self._steps_generator)
 
             if batch_count == self._batch_size:
                 self._learn(episode_idx)
@@ -70,9 +69,9 @@ class REINFORCE(AgentTraining):
         self._plotter.close()
 
     def _learn(self, episode_idx):
-        t_act = LongTensor(self._memory.actions).cuda()
-        t_state = FloatTensor(self._memory.states).cuda()
-        t_qval = FloatTensor(self._memory.q_vals).cuda()
+        t_act = LongTensor(self._memory.actions).to(self._device)
+        t_state = FloatTensor(self._memory.states).to(self._device)
+        t_qval = FloatTensor(self._memory.q_vals).to(self._device)
 
         self._optimizer.zero_grad()
 
@@ -112,10 +111,6 @@ class REINFORCE(AgentTraining):
         self._memory.actions.append(transition.action)
         self._memory.rewards.append(transition.reward)
 
-    @classmethod
-    def load_selector(cls, load_path) -> ActionSelector:
-        return LogitActionSelector(model=load(load_path))
-
-    @classmethod
-    def get_environment(cls):
-        return gym.make("CartPole-v1")
+    @property
+    def model(self):
+        return deepcopy(self._model)

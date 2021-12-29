@@ -1,4 +1,5 @@
 from collections import deque
+from copy import deepcopy
 
 import gym
 import torch.multiprocessing as mp
@@ -8,8 +9,9 @@ from torch import load, save, nn
 from torch.optim import Adam
 
 from synapse.action_selectors.base import ActionSelector
-from synapse.action_selectors.policy import VecLogitActionSelector, LogitActionSelector
-from synapse.agents.base import AgentTraining
+from synapse.action_selectors.policy import PolicyActionsSelector, PolicyActionSelector
+from synapse.agents.base import DiscreteAgentTraining
+from synapse.models import A3CNetwork
 from synapse.steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransition
 from synapse.util import unpack, can_stop
 
@@ -19,8 +21,8 @@ def env_maker(): return gym.make("CartPole-v1")
 
 def child_process(queue, envs_per_thread, model, n_steps, gamma):
     steps_generator = MultiEnvCompressedStepsGenerator([env_maker() for _ in range(envs_per_thread)],
-                                                       VecLogitActionSelector(model=lambda x: model(x)[0],
-                                                                              model_device="cpu"),
+                                                       PolicyActionsSelector(model=lambda x: model(x)[0],
+                                                                             model_device="cpu"),
                                                        n_steps=n_steps, gamma=gamma)
 
     # Play the game and push the experiences into the queue
@@ -34,40 +36,14 @@ def child_process(queue, envs_per_thread, model, n_steps, gamma):
             queue.put(new_rewards[0])
 
 
-class A3CNetwork(nn.Module):
-    def __init__(self, input_shape, n_actions):
-        super().__init__()
-
-        self._base = nn.Sequential(
-            nn.Linear(input_shape, 128),
-            nn.ReLU()
-        )
-
-        self._value_head = nn.Sequential(
-            nn.Linear(input_shape, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
-        )
-
-        self._policy_head = nn.Sequential(
-            nn.Linear(input_shape, 128),
-            nn.ReLU(),
-            nn.Linear(128, n_actions)
-        )
-
-    def forward(self, x):
-        # base_output = self._base(x)
-        return self._policy_head(x), self._value_head(x)
-
-
-class A3C(AgentTraining):
+class A3C(DiscreteAgentTraining):
     """
     A version of A3C where different threads play with different environments but the learning is done centrally.
     """
 
-    # TODO: more gpu
-
     def __init__(self,
+                 env,
+                 model,
                  gamma=0.99,
                  beta=0.01,
                  lr=0.001,
@@ -94,8 +70,8 @@ class A3C(AgentTraining):
         self._memory = list()
         self._clip_grad = clip_grad
 
-        self._ref_env = self.get_environment()  # Reference environment should not be actually used to play episodes.
-        self._model = A3CNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n)
+        self._env = env
+        self._model = model
         self._model.share_memory()
         self._optimizer = Adam(params=self._model.parameters(), lr=lr, eps=1e-3)
 
@@ -203,11 +179,6 @@ class A3C(AgentTraining):
         self._plotter.add_scalar("Entropy", entropy.item(), step_idx)
         self._plotter.add_scalar("KL Divergence", kl_divergence.item(), step_idx)
 
-    @classmethod
-    def load_selector(cls, load_path) -> ActionSelector:
-        loaded_model = load(load_path)
-        return LogitActionSelector(model=lambda x: loaded_model(x)[0], model_device="cpu")
-
-    @classmethod
-    def get_environment(cls):
-        return env_maker()
+    @property
+    def model(self):
+        return deepcopy(self._model)

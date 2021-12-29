@@ -1,12 +1,14 @@
+import os
 from collections import deque
+from copy import deepcopy
 
 import gym
 from tensorboardX import SummaryWriter
 from torch import cuda, nn, load, save
 from torch.optim import Adam
 from synapse.action_selectors.base import ActionSelector
-from synapse.action_selectors.policy import LogitActionSelector, VecLogitActionSelector
-from ..base import AgentTraining
+from synapse.action_selectors.policy import PolicyActionSelector, PolicyActionsSelector
+from ..base import DiscreteAgentTraining
 import torch.nn.utils as nn_utils
 from synapse.steps_generators import MultiEnvCompressedStepsGenerator
 import torch.nn.functional as F
@@ -14,34 +16,11 @@ import torch.nn.functional as F
 from synapse.util import unpack, can_stop
 
 
-class A2CNetwork(nn.Module):
-    def __init__(self, input_shape, n_actions):
-        super().__init__()
-
-        self._base = nn.Sequential(
-            nn.Linear(input_shape, 128),
-            nn.ReLU()
-        )
-
-        self._value_head = nn.Sequential(
-            nn.Linear(input_shape, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
-        )
-
-        self._policy_head = nn.Sequential(
-            nn.Linear(input_shape, 128),
-            nn.ReLU(),
-            nn.Linear(128, n_actions)
-        )
-
-    def forward(self, x):
-        #base_output = self._base(x)
-        return self._policy_head(x), self._value_head(x)
-
-
-class A2C(AgentTraining):
+class A2C(DiscreteAgentTraining):
     def __init__(self,
+                 environment: gym.Env,
+                 model,
+                 device="cuda",
                  gamma=0.99,
                  beta=0.01,
                  lr=0.001,
@@ -53,6 +32,9 @@ class A2C(AgentTraining):
                  clip_grad=1e12):
         super().__init__()
 
+        self._device = device
+        self._model = model
+        self._environment = environment
         self._n_envs = n_envs
         self._unfolding_steps = unfolding_steps
         self._desired_avg_reward = desired_avg_reward
@@ -65,21 +47,22 @@ class A2C(AgentTraining):
         self._memory = list()
         self._clip_grad = clip_grad
 
-        self._ref_env = self.get_environment()  # Reference environment should not be actually used to play episodes.
-        self._model = A2CNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n).cuda()
         self._optimizer = Adam(params=self._model.parameters(), lr=lr, eps=1e-3)
+        envs = [deepcopy(self._environment) for i in range(self._n_envs)]
+        def first_head_model(obs): return self._model(obs)[0]
+        self._steps_generator = MultiEnvCompressedStepsGenerator(envs,
+                                                                 PolicyActionsSelector(model=first_head_model),
+                                                                 n_steps=self._unfolding_steps,
+                                                                 gamma=self._gamma)
 
         # Logging related
         self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
 
     def train(self, save_path):
-        steps_generator = MultiEnvCompressedStepsGenerator([self.get_environment() for i in range(self._n_envs)],
-                                                           VecLogitActionSelector(model=lambda x: self._model(x)[0]),
-                                                           n_steps=self._unfolding_steps, gamma=self._gamma)
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
 
-        for idx, transition in enumerate(steps_generator):
+        for idx, transition in enumerate(self._steps_generator):
             if can_stop(idx, self._n_training_steps, last_episodes_rewards, self._desired_avg_reward):
                 save(self._model, save_path)
                 break
@@ -89,7 +72,7 @@ class A2C(AgentTraining):
             if transition.done:
                 episode_idx += 1
 
-                self._log_new_rewards(episode_idx, idx, last_episodes_rewards, steps_generator)
+                self._log_new_rewards(episode_idx, idx, last_episodes_rewards, self._steps_generator)
 
             if len(self._memory) == self._batch_size:
                 self._learn(idx)
@@ -110,7 +93,7 @@ class A2C(AgentTraining):
                                               self._model,
                                               self._gamma,
                                               self._unfolding_steps,
-                                              "cuda")
+                                              self._device)
         self._optimizer.zero_grad()
         t_logits, t_values = self._model(t_states)
         t_log_probs = t_logits.log_softmax(dim=1)
@@ -140,12 +123,6 @@ class A2C(AgentTraining):
         self._plotter.add_scalar("Entropy", entropy.item(), idx)
         self._plotter.add_scalar("KL Divergence", kl_divergence.item(), idx)
 
-    @classmethod
-    def load_selector(cls, load_path) -> ActionSelector:
-        loaded_model = load(load_path)
-
-        return LogitActionSelector(model=lambda x: loaded_model(x)[0])
-
-    @classmethod
-    def get_environment(cls):
-        return gym.make("CartPole-v1")
+    @property
+    def model(self):
+        return deepcopy(self._model)

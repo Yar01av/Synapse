@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from .action_selectors.base import ActionSelector, VectorActionSelector
+from typing import Callable
+
+from .action_selectors.base import ActionSelector, ActionsSelector
 
 Transition = namedtuple("Transition", ["state", "action", "reward"])
 CompleteTransition = namedtuple("CompleteTransition", ["previous_state", "next_state", "action", "reward", "done"])
@@ -138,7 +140,7 @@ class MultiEnvCompressedStepsGenerator(BaseStepsGenerator):
     by maintaining several environments and sampling them in a round robin fashion.
     """
 
-    def __init__(self, envs, action_selector: VectorActionSelector, n_steps=1, gamma=1):
+    def __init__(self, envs, action_selector: ActionsSelector, n_steps=1, gamma=1):
         assert n_steps >= 1
 
         self._action_selector = action_selector

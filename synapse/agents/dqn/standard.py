@@ -1,35 +1,23 @@
+import random
 from collections import deque
+from copy import deepcopy
 
 import gym
 from tensorboardX import SummaryWriter
-from torch import cuda, nn, load, save, LongTensor, FloatTensor, IntTensor, squeeze, max
+from torch import cuda, nn, save, LongTensor, FloatTensor, IntTensor, squeeze, max
 from torch.optim import Adam
-from synapse.action_selectors.base import ActionSelector
-from synapse.action_selectors.value import GreedySelector, EpsilonGreedySelector
-from ..base import AgentTraining
+
+from synapse.action_selectors.other import EpsilonActionSelector
 from synapse.steps_generators import CompressedStepsGenerator
-import random
-
 from synapse.util import can_stop
+from ..base import DiscreteAgentTraining
+from ...action_selectors.value import GreedyActionSelector
 
 
-# The neural network module
-class DQNNetwork(nn.Module):
-    def __init__(self, input_shape, n_actions):
-        super().__init__()
-
-        self._model = nn.Sequential(nn.Linear(input_shape, 150),
-                                    nn.ReLU(),
-                                    nn.Linear(150, 120),
-                                    nn.ReLU(),
-                                    nn.Linear(120, n_actions))
-
-    def forward(self, x):
-        return self._model(x)
-
-
-class DQN(AgentTraining):
+class DQN(DiscreteAgentTraining):
     def __init__(self,
+                 environment: gym.Env,
+                 model,
                  gamma=0.99,
                  lr=0.001,
                  batch_size=34,
@@ -43,6 +31,7 @@ class DQN(AgentTraining):
                  device="cuda"):
         super().__init__()
 
+        self._environment = environment
         self._device = device
         self._unfolding_steps = unfolding_steps
         self._epsilon_decay = epsilon_decay
@@ -56,31 +45,29 @@ class DQN(AgentTraining):
         self._gamma = gamma
         cuda.set_device(0)
         self._buffer = deque(maxlen=max_buffer_size)
-
-        self._ref_env = self.get_environment()  # Reference environment should not be actually used to play episodes.
-        self._model = DQNNetwork(self._ref_env.observation_space.shape[0], self._ref_env.action_space.n).cuda()
+        self._model = model
         self._optimizer = Adam(params=self._model.parameters(), lr=lr)
+
+        inner_selector = GreedyActionSelector(model=self._model, model_device=self._device)
+        self._action_selector = EpsilonActionSelector(selector=inner_selector,
+                                                      n_actions=self._environment.action_space.n,
+                                                      init_epsilon=self._epsilon,
+                                                      min_epsilon=self._epsilon_min,
+                                                      epsilon_decay=self._epsilon_decay)
+        self._steps_generator = CompressedStepsGenerator(self._environment,
+                                                         self._action_selector,
+                                                         n_steps=self._unfolding_steps,
+                                                         gamma=self._gamma)
 
         # Logging related
         self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
 
     def train(self, save_path):
-        action_selector = EpsilonGreedySelector(model=self._model,
-                                                n_actions=self._ref_env.action_space.n,
-                                                model_device=self._device,
-                                                init_epsilon=self._epsilon,
-                                                min_epsilon=self._epsilon_min,
-                                                epsilon_decay=self._epsilon_decay)
-        steps_generator = CompressedStepsGenerator(self.get_environment(),
-                                                   action_selector,
-                                                   n_steps=self._unfolding_steps,
-                                                   gamma=self._gamma)
-
         last_episodes_rewards = deque(maxlen=100)
         episode_idx = 0
 
         # Iterate over the transitions and learn if the right transition arrives
-        for idx, transition in enumerate(steps_generator):
+        for idx, transition in enumerate(self._steps_generator):
             # Stop if the right number of reward has been reached or the maximum number of the iterations exceeded.
             if can_stop(idx, self._n_training_steps, last_episodes_rewards, self._desired_avg_reward):
                 save(self._model, save_path)
@@ -92,7 +79,7 @@ class DQN(AgentTraining):
             # Log the results at the end of an episode
             if transition.done:
                 episode_idx += 1
-                self._log_new_rewards(episode_idx, idx, last_episodes_rewards, steps_generator)
+                self._log_new_rewards(episode_idx, idx, last_episodes_rewards, self._steps_generator)
 
             # Perform a training step
             if len(self._buffer) >= self._batch_size:
@@ -100,7 +87,7 @@ class DQN(AgentTraining):
                 self._learn(states, targets, self._optimizer)
 
             # Reduce exploration
-            action_selector.decay_epsilon()
+            self._action_selector.decay_epsilon()
 
         self._plotter.close()
 
@@ -134,7 +121,8 @@ class DQN(AgentTraining):
         next_states = squeeze(next_states)
 
         # Use Bellman equation to compute the targets
-        targets = rewards + self._gamma * max(self._model(next_states).detach(), dim=1)[0].to(self._device) * (-dones + 1)
+        targets = rewards + self._gamma * max(self._model(next_states).detach(), dim=1)[0].to(self._device) * (
+                    -dones + 1)
         targets.to(self._device)
         targets_full = self._model(states).detach()
         ind = LongTensor([i for i in range(self._batch_size)]).to(self._device)
@@ -144,14 +132,6 @@ class DQN(AgentTraining):
 
         return states, targets_full
 
-    @classmethod
-    def load_selector(cls, load_path) -> ActionSelector:
-        # It's important to return this selector as the algorithm is off-policy.
-        return GreedySelector(model=load(load_path))
-
-    @classmethod
-    def get_environment(cls):
-        env = gym.make("CartPole-v1")
-        env.seed(0)
-
-        return env
+    @property
+    def model(self):
+        return deepcopy(self._model)
