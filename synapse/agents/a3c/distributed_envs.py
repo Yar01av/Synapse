@@ -1,5 +1,6 @@
 from collections import deque
 from copy import deepcopy
+from pathlib import Path
 
 import gym
 import torch.multiprocessing as mp
@@ -76,7 +77,7 @@ class A3C(DiscreteAgentTraining):
         self._optimizer = Adam(params=self._model.parameters(), lr=lr, eps=1e-3)
 
         # Logging related
-        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
+        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}", logdir=Path("../../runs"))
 
     def train(self, save_path):
         last_episodes_rewards = deque(maxlen=100)

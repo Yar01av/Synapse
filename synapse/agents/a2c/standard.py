@@ -1,6 +1,7 @@
 import os
 from collections import deque
 from copy import deepcopy
+from pathlib import Path
 
 import gym
 from tensorboardX import SummaryWriter
@@ -56,7 +57,7 @@ class A2C(DiscreteAgentTraining):
                                                                  gamma=self._gamma)
 
         # Logging related
-        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
+        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}", logdir=Path("../../runs"))
 
     def train(self, save_path):
         last_episodes_rewards = deque(maxlen=100)

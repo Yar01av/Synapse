@@ -1,5 +1,6 @@
 from collections import deque
 from copy import deepcopy
+from pathlib import Path
 
 import gym
 from torch.optim import Adam
@@ -41,7 +42,7 @@ class REINFORCE(DiscreteAgentTraining):
 
         # Logging related
         SummaryWriter(comment=f"x{self.__class__.__name__}").close()
-        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}")
+        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}", logdir=Path("../../runs"))
 
     def train(self, save_path):
         batch_count = 0
