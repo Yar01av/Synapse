@@ -1,20 +1,19 @@
-import os
+from collections import deque
 from collections import deque
 from copy import deepcopy
 from pathlib import Path
 
 import gym
-from tensorboardX import SummaryWriter
-from torch import cuda, nn, load, save
-from torch.optim import Adam
-from synapse.action_selectors.base import ActionSelector
-from synapse.action_selectors.policy import PolicyActionSelector, PolicyActionsSelector
-from ..base import DiscreteAgentTraining
-import torch.nn.utils as nn_utils
-from synapse.steps_generators import MultiEnvCompressedStepsGenerator
 import torch.nn.functional as F
+import torch.nn.utils as nn_utils
+from tensorboardX import SummaryWriter
+from torch import cuda, save
+from torch.optim import Adam
 
+from synapse.action_selectors.policy import PolicyActionsSelector
+from synapse.steps_generators import MultiEnvCompressedStepsGenerator
 from synapse.util import unpack, can_stop
+from ..base import DiscreteAgentTraining
 
 
 class A2C(DiscreteAgentTraining):

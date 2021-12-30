@@ -1,23 +1,18 @@
-import os
 from pathlib import Path
 
+import gym
+import numpy as np
+import torch
+from torch import cuda
+
+import random
 # import os
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 from random import seed
-
-import gym
-import torch
-import numpy as np
-from torch import cuda
-
 from synapse.action_selectors.policy import PolicyActionSelector
 from synapse.agents.reinforce.standard import REINFORCE
 from synapse.demo import render_local_play
-from synapse.models import DQNNetwork, REINFORCENetwork
-from synapse.action_selectors.value import GreedyActionSelector
-from synapse.agents.dqn.standard import DQN
-import random
-
+from synapse.models import REINFORCENetwork
 
 # Seed to make sure that the results are reproducible
 seed(0)

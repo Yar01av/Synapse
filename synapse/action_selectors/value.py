@@ -1,8 +1,5 @@
-from abc import abstractmethod
-
 import numpy as np
 from torch import FloatTensor
-import random
 
 from .base import ActionSelector
 

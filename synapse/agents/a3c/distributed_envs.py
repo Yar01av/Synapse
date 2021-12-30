@@ -6,13 +6,11 @@ import gym
 import torch.multiprocessing as mp
 import torch.nn.functional as F
 from tensorboardX import SummaryWriter
-from torch import load, save, nn
+from torch import save
 from torch.optim import Adam
 
-from synapse.action_selectors.base import ActionSelector
-from synapse.action_selectors.policy import PolicyActionsSelector, PolicyActionSelector
+from synapse.action_selectors.policy import PolicyActionsSelector
 from synapse.agents.base import DiscreteAgentTraining
-from synapse.models import A3CNetwork
 from synapse.steps_generators import MultiEnvCompressedStepsGenerator, CompressedTransition
 from synapse.util import unpack, can_stop
 

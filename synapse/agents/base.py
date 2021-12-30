@@ -1,8 +1,5 @@
 from abc import ABC, abstractmethod
 
-import gym
-from synapse.action_selectors.base import ActionSelector
-
 
 class DiscreteAgentTraining(ABC):
     """

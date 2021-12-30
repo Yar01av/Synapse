@@ -1,24 +1,19 @@
-import os
 from pathlib import Path
-from random import seed
+from pathlib import Path
 
 # import os
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 import gym
-import torch
 import numpy as np
+import torch
 from torch import cuda
 
-from synapse.action_selectors.policy import PolicyActionSelector
-from synapse.agents.a2c.standard import A2C
-from synapse.agents.a3c.distributed_envs import A3C
-from synapse.agents.reinforce.standard import REINFORCE
-from synapse.demo import render_local_play
-from synapse.models import DQNNetwork, REINFORCENetwork, A2CNetwork, A3CNetwork
-from synapse.action_selectors.value import GreedyActionSelector
-from synapse.agents.dqn.standard import DQN
 import random
-
+from random import seed
+from synapse.action_selectors.policy import PolicyActionSelector
+from synapse.agents.a3c.distributed_envs import A3C
+from synapse.demo import render_local_play
+from synapse.models import A3CNetwork
 
 # Seed to make sure that the results are reproducible
 seed(0)

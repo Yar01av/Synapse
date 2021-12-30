@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from typing import Callable
 
 from .action_selectors.base import ActionSelector, ActionsSelector
 

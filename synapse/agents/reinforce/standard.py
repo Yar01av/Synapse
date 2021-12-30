@@ -3,15 +3,15 @@ from copy import deepcopy
 from pathlib import Path
 
 import gym
-from torch.optim import Adam
 from tensorboardX import SummaryWriter
+from torch import save, LongTensor, FloatTensor
+from torch.optim import Adam
 
 from synapse.action_selectors.policy import PolicyActionSelector
-from ..base import DiscreteAgentTraining
-from torch import load, nn, cuda, save, LongTensor, FloatTensor
 from synapse.memory import CompositeMemory
 from synapse.steps_generators import CompressedStepsGenerator
 from synapse.util import can_stop
+from ..base import DiscreteAgentTraining
 
 
 class REINFORCE(DiscreteAgentTraining):
