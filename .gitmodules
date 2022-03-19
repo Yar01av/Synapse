@@ -1,0 +1,3 @@
+[submodule "GeNe"]
+	path = GeNe
+	url = https://github.com/Yar01av/GeNe.git

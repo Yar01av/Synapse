@@ -14,7 +14,7 @@ from synapse.util import can_stop
 from ..base import DiscreteAgentTraining
 
 
-class REINFORCE(DiscreteAgentTraining):
+class GradientREINFORCE(DiscreteAgentTraining):
     def __init__(self,
                  env: gym.Env,
                  model,

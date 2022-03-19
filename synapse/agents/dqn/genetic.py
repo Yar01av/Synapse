@@ -1,14 +1,15 @@
 import random
-import time
 from collections import deque
 from copy import deepcopy
 from pathlib import Path
-
+import time
 import gym
 from tensorboardX import SummaryWriter
+import torch
 from torch import cuda, nn, save, LongTensor, FloatTensor, IntTensor, squeeze, max
-from torch.optim import Adam
+import torch.nn.functional as F
 
+from gene.optimisers.division import DivisionOptimiser, ParallelDivisionOptimiser
 from synapse.action_selectors.other import EpsilonActionSelector
 from synapse.steps_generators import CompressedStepsGenerator
 from synapse.util import can_stop
@@ -16,10 +17,10 @@ from ..base import DiscreteAgentTraining
 from ...action_selectors.value import GreedyActionSelector
 
 
-class GradientDQN(DiscreteAgentTraining):
+class GeneticDQN(DiscreteAgentTraining):
     def __init__(self,
                  environment: gym.Env,
-                 model,
+                 models,
                  gamma=0.99,
                  lr=0.001,
                  batch_size=34,
@@ -30,6 +31,8 @@ class GradientDQN(DiscreteAgentTraining):
                  epsilon_min=0.01,
                  unfolding_steps=1,
                  epsilon_decay=0.996,
+                 selection_limit=100,
+                 mutation_random_function=lambda shape: torch.normal(0, 0.2, shape),
                  device="cuda",
                  logdir="./runs"):
         super().__init__()
@@ -48,10 +51,13 @@ class GradientDQN(DiscreteAgentTraining):
         self._gamma = gamma
         cuda.set_device(0)
         self._buffer = deque(maxlen=max_buffer_size)
-        self._model = model
-        self._optimizer = Adam(params=self._model.parameters(), lr=lr)
+        self._models = models
+        self._optimizer = DivisionOptimiser(loss=nn.MSELoss(),
+                                            random_function=mutation_random_function,
+                                            selection_limit=selection_limit,
+                                            device=device)
 
-        inner_selector = GreedyActionSelector(model=self._model, model_device=self._device)
+        inner_selector = GreedyActionSelector(model=lambda x: self._models[0](x), model_device=self._device)
         self._action_selector = EpsilonActionSelector(selector=inner_selector,
                                                       n_actions=self._environment.action_space.n,
                                                       init_epsilon=self._epsilon,
@@ -73,7 +79,7 @@ class GradientDQN(DiscreteAgentTraining):
         for idx, transition in enumerate(self._steps_generator):
             # Stop if the right number of reward has been reached or the maximum number of the iterations exceeded.
             if can_stop(idx, self._n_training_steps, last_episodes_rewards, self._desired_avg_reward):
-                save(self._model, save_path)
+                save(self._models[0], save_path)
                 break
 
             # Remember the new transition
@@ -87,7 +93,9 @@ class GradientDQN(DiscreteAgentTraining):
             # Perform a training step
             if len(self._buffer) >= self._batch_size:
                 states, targets = self._replay(self._buffer, self._batch_size)
-                self._learn(states, targets, self._optimizer)
+
+                for _ in range(10):
+                    self._models = self._optimizer.step(models=self._models, X=states.to(self._device), y_true=targets)
 
             # Reduce exploration
             self._action_selector.decay_epsilon()
@@ -101,14 +109,6 @@ class GradientDQN(DiscreteAgentTraining):
         self._plotter.add_scalar("Total reward per episode", new_rewards[0], episode_idx)
         print(f"At step {idx}, \t the average over the last 100 games is "
               f"{sum(last_episodes_rewards) / min(len(last_episodes_rewards), 100)}")
-
-    def _learn(self, states, targets, optimizer):
-        predictions = self._model(states.to(self._device))
-        loss = nn.MSELoss()(predictions, targets.to(self._device))
-        loss.backward()
-
-        optimizer.step()
-        optimizer.zero_grad()
 
     def _replay(self, memory, batch_size):
         # Sample the minibatch and extract the useful tensors out of it
@@ -124,10 +124,10 @@ class GradientDQN(DiscreteAgentTraining):
         next_states = squeeze(next_states)
 
         # Use Bellman equation to compute the targets
-        targets = rewards + self._gamma * max(self._model(next_states).detach(), dim=1)[0].to(self._device) * (
-                    -dones + 1)
+        targets = rewards + self._gamma * max(self._models[0](next_states).detach(), dim=1)[0].to(self._device) * (
+                -dones + 1)
         targets.to(self._device)
-        targets_full = self._model(states).detach()
+        targets_full = self._models[0](states).detach()
         ind = LongTensor([i for i in range(self._batch_size)]).to(self._device)
 
         # Add the targets to the original model prediction
@@ -137,4 +137,4 @@ class GradientDQN(DiscreteAgentTraining):
 
     @property
     def model(self):
-        return deepcopy(self._model)
+        return deepcopy(self._models[0])
