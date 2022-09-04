@@ -9,14 +9,12 @@ import torch
 from torch import cuda
 
 import random
-from random import seed
 from synapse.action_selectors.policy import PolicyActionSelector
 from synapse.agents.a2c.standard import A2C
 from synapse.demo import render_local_play
 from synapse.models import A2CNetwork
 
 # Seed to make sure that the results are reproducible
-seed(0)
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
@@ -34,7 +32,7 @@ if __name__ == "__main__":
     env.seed(0)
     model = A2CNetwork(env.observation_space.shape[0], env.action_space.n).cuda()
 
-    training = A2C(env, model=model, max_training_steps=10000, device="cuda")
+    training = A2C(env, model=model, max_training_steps=100_000, device="cuda")
     training.train(Path("../checkpoints/checkpoint.h5"))
 
     selector = PolicyActionSelector(lambda obs: training.model(obs)[0], model_device="cuda")

@@ -8,9 +8,11 @@ import torch
 from torch import cuda
 
 import random
+from gene.selections.top_n import TopNSelection
 from synapse.action_selectors.value import GreedyActionSelector
-from synapse.agents.dqn.genetic import GeneticDQN
+from synapse.agents.dqn.genetic_gradient import GeneticGradientDQN
 from synapse.agents.dqn.standard import GradientDQN
+from synapse.agents.grad_free.genetic import GeneticGradientFree
 from synapse.demo import render_local_play
 from synapse.models import DQNNetwork
 
@@ -33,11 +35,15 @@ if __name__ == "__main__":
     env.seed(0)
     model = DQNNetwork(env.observation_space.shape[0], env.action_space.n).to(DEVICE)
 
-    training = GeneticDQN(env, models=[model],
-                          max_training_steps=20_000,
-                          device=DEVICE,
-                          logdir=Path("../runs"),
-                          selection_limit=10)
+    training = GeneticGradientFree(
+        env,
+        training_iterations=2_000,
+        loss_estimation_steps=500,
+        models=[model],
+        device=DEVICE,
+        logdir=Path("../runs"),
+        selection=TopNSelection(10)
+    )
     training.train(Path("../checkpoints/checkpoint.h5"))
 
     selector = GreedyActionSelector(training.model, model_device=DEVICE)

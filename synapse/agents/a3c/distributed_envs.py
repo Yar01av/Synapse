@@ -52,7 +52,8 @@ class A3C(DiscreteAgentTraining):
                  unfolding_steps=2,
                  envs_per_thread=1,
                  clip_grad=0.1,
-                 n_processes=8):
+                 n_processes=8,
+                 logdir="./runs"):
         super().__init__()
 
         mp.set_start_method('spawn')
@@ -75,7 +76,7 @@ class A3C(DiscreteAgentTraining):
         self._optimizer = Adam(params=self._model.parameters(), lr=lr, eps=1e-3)
 
         # Logging related
-        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}", logdir=Path("../../runs"))
+        self._plotter = SummaryWriter(logdir=f"{logdir}/{time.strftime('%c')}--{self.__class__.__name__}")
 
     def train(self, save_path):
         last_episodes_rewards = deque(maxlen=100)

@@ -10,6 +10,8 @@ from torch import cuda, nn, save, LongTensor, FloatTensor, IntTensor, squeeze, m
 import torch.nn.functional as F
 
 from gene.optimisers.division import DivisionOptimiser, ParallelDivisionOptimiser
+from gene.selections.top_n import TopNSelection
+from gene.targets import make_supervised_loss
 from synapse.action_selectors.other import EpsilonActionSelector
 from synapse.steps_generators import CompressedStepsGenerator
 from synapse.util import can_stop
@@ -17,12 +19,11 @@ from ..base import DiscreteAgentTraining
 from ...action_selectors.value import GreedyActionSelector
 
 
-class GeneticDQN(DiscreteAgentTraining):
+class GeneticGradientDQN(DiscreteAgentTraining):
     def __init__(self,
                  environment: gym.Env,
                  models,
                  gamma=0.99,
-                 lr=0.001,
                  batch_size=34,
                  max_training_steps=10_000_000,
                  desired_avg_reward=500,
@@ -31,8 +32,7 @@ class GeneticDQN(DiscreteAgentTraining):
                  epsilon_min=0.01,
                  unfolding_steps=1,
                  epsilon_decay=0.996,
-                 selection_limit=100,
-                 mutation_random_function=lambda shape: torch.normal(0, 0.2, shape),
+                 selection=TopNSelection(100),
                  device="cuda",
                  logdir="./runs"):
         super().__init__()
@@ -47,14 +47,16 @@ class GeneticDQN(DiscreteAgentTraining):
         self._desired_avg_reward = desired_avg_reward
         self._n_training_steps = max_training_steps
         self._batch_size = batch_size
-        self._lr = lr
         self._gamma = gamma
         cuda.set_device(0)
         self._buffer = deque(maxlen=max_buffer_size)
         self._models = models
-        self._optimizer = DivisionOptimiser(loss=nn.MSELoss(),
-                                            random_function=mutation_random_function,
-                                            selection_limit=selection_limit,
+
+        # Optimiser variables
+        self._optimizer = DivisionOptimiser(random_function=lambda shape: torch.normal(0,
+                                                                                       self._mutation_variance,
+                                                                                       shape),
+                                            selection=selection,
                                             device=device)
 
         inner_selector = GreedyActionSelector(model=lambda x: self._models[0](x), model_device=self._device)
@@ -89,13 +91,19 @@ class GeneticDQN(DiscreteAgentTraining):
             if transition.done:
                 episode_idx += 1
                 self._log_new_rewards(episode_idx, idx, last_episodes_rewards, self._steps_generator)
+                self._plotter.add_scalar("Epsilon", self._action_selector.epsilon, episode_idx)
 
             # Perform a training step
             if len(self._buffer) >= self._batch_size:
                 states, targets = self._replay(self._buffer, self._batch_size)
 
-                for _ in range(10):
-                    self._models = self._optimizer.step(models=self._models, X=states.to(self._device), y_true=targets)
+                for _ in range(100):
+                    loss_for_model = make_supervised_loss(
+                        loss=nn.MSELoss(),
+                        X=states.to(self._device),
+                        y=targets
+                    )
+                    self._models = self._optimizer.step(models=self._models, loss_function=loss_for_model)
 
             # Reduce exploration
             self._action_selector.decay_epsilon()

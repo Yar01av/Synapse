@@ -29,7 +29,8 @@ class A2C(DiscreteAgentTraining):
                  desired_avg_reward=500,
                  unfolding_steps=2,
                  n_envs=1,
-                 clip_grad=1e12):
+                 clip_grad=1e12,
+                 logdir="./runs"):
         super().__init__()
 
         self._device = device
@@ -56,7 +57,7 @@ class A2C(DiscreteAgentTraining):
                                                                  gamma=self._gamma)
 
         # Logging related
-        self._plotter = SummaryWriter(comment=f"x{self.__class__.__name__}", logdir=Path("../../runs"))
+        self._plotter = SummaryWriter(logdir=f"{logdir}/{time.strftime('%c')}--{self.__class__.__name__}")
 
     def train(self, save_path):
         last_episodes_rewards = deque(maxlen=100)

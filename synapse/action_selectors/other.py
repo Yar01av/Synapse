@@ -35,3 +35,7 @@ class EpsilonActionSelector(ActionSelector):
     def decay_epsilon(self):
         if self._epsilon > self._min_epsilon:
             self._epsilon *= self._epsilon_decay
+
+    @property
+    def epsilon(self):
+        return self._epsilon
